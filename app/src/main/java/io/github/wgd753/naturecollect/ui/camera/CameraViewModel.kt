@@ -1,0 +1,141 @@
+package io.github.wgd753.naturecollect.ui.camera
+
+import android.graphics.Bitmap
+import android.graphics.Color
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import io.github.wgd753.naturecollect.AppContainer
+import io.github.wgd753.naturecollect.data.db.CaptureEntity
+import io.github.wgd753.naturecollect.ml.PromptPoint
+import io.github.wgd753.naturecollect.ml.SamImage
+import io.github.wgd753.naturecollect.ml.StickerMaker
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
+
+sealed interface CameraStage {
+    data object Live : CameraStage
+
+    /** Encoder running on the new photo. */
+    data class Finding(val photo: Bitmap) : CameraStage
+
+    /** A sticker is ready to be peeled off. */
+    data class Sticker(val image: SamImage, val sticker: Bitmap) : CameraStage
+
+    /** The user is tapping to choose a different subject. */
+    data class Selecting(val image: SamImage, val overlay: Bitmap?, val busy: Boolean) : CameraStage
+
+    data class Saved(val captureId: String) : CameraStage
+
+    data class Failed(val message: String) : CameraStage
+}
+
+class CameraViewModel(private val container: AppContainer) : ViewModel() {
+    private val _stage = MutableStateFlow<CameraStage>(CameraStage.Live)
+    val stage: StateFlow<CameraStage> = _stage.asStateFlow()
+
+    private var photo: Bitmap? = null
+    private var takenAt: Long = 0
+    private var latLng: DoubleArray? = null
+    private var points: List<PromptPoint> = emptyList()
+    private var pendingSticker: Bitmap? = null
+    private var job: Job? = null
+
+    /** Starts the pipeline for a new photo. [exifLatLng] comes from imported photos. */
+    fun onPhoto(bitmap: Bitmap, exifLatLng: DoubleArray? = null, exifTime: Long? = null) {
+        job?.cancel()
+        photo = bitmap
+        takenAt = exifTime ?: System.currentTimeMillis()
+        latLng = exifLatLng
+        _stage.value = CameraStage.Finding(bitmap)
+        job = viewModelScope.launch {
+            val location = if (exifLatLng == null) async { container.location.current() } else null
+            try {
+                val image = container.segmenter.encode(bitmap)
+                // Default prompt: whatever is in the middle of the frame.
+                points = listOf(PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f))
+                val alpha = container.segmenter.segment(image, points)
+                val sticker = StickerMaker.make(image.bitmap, alpha)
+                latLng = latLng ?: location?.await()?.let { doubleArrayOf(it.latitude, it.longitude) }
+                _stage.value = if (sticker != null) {
+                    CameraStage.Sticker(image, sticker)
+                } else {
+                    CameraStage.Selecting(image, overlay = null, busy = false)
+                }
+            } catch (e: Exception) {
+                _stage.value = CameraStage.Failed("抠图失败：${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    fun startSelecting() {
+        val stage = _stage.value as? CameraStage.Sticker ?: return
+        pendingSticker = stage.sticker
+        _stage.value = CameraStage.Selecting(stage.image, overlay = null, busy = false)
+    }
+
+    /** Re-runs only the fast decoder for a new tap. */
+    fun select(point: PromptPoint) {
+        val stage = _stage.value as? CameraStage.Selecting ?: return
+        job?.cancel()
+        _stage.value = stage.copy(busy = true)
+        job = viewModelScope.launch {
+            points = listOf(point)
+            val alpha = container.segmenter.segment(stage.image, points)
+            pendingSticker = StickerMaker.make(stage.image.bitmap, alpha)
+            _stage.value = CameraStage.Selecting(stage.image, overlay = maskOverlay(alpha, stage.image.bitmap), busy = false)
+        }
+    }
+
+    fun confirmSelection() {
+        val stage = _stage.value as? CameraStage.Selecting ?: return
+        val sticker = pendingSticker ?: return
+        _stage.value = CameraStage.Sticker(stage.image, sticker)
+    }
+
+    fun save() {
+        val stage = _stage.value as? CameraStage.Sticker ?: return
+        val original = photo ?: return
+        viewModelScope.launch {
+            val capture = container.captures.create(
+                photo = limit(original, 2048),
+                sticker = stage.sticker,
+                latitude = latLng?.get(0),
+                longitude = latLng?.get(1),
+                takenAt = takenAt,
+            )
+            _stage.value = CameraStage.Saved(capture.id)
+            container.recognition.schedule()
+        }
+    }
+
+    fun observeCapture(id: String): Flow<CaptureEntity?> =
+        if (id.isEmpty()) emptyFlow() else container.captures.observe(id)
+
+    fun reset() {
+        job?.cancel()
+        photo = null
+        pendingSticker = null
+        _stage.value = CameraStage.Live
+    }
+
+    fun fail(message: String) {
+        _stage.value = CameraStage.Failed(message)
+    }
+
+    /** Ink-blue translucent highlight over the selected object. */
+    private fun maskOverlay(alpha: FloatArray, image: Bitmap): Bitmap {
+        val w = image.width
+        val h = image.height
+        val pixels = IntArray(w * h) { i ->
+            val a = (alpha[i] * 140).toInt().coerceIn(0, 255)
+            Color.argb(a, 70, 90, 255)
+        }
+        return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
+    }
+}

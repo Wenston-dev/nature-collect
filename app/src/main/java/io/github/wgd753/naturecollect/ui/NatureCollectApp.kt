@@ -1,5 +1,6 @@
 package io.github.wgd753.naturecollect.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesomeMosaic
@@ -29,9 +30,14 @@ import io.github.wgd753.naturecollect.ui.board.BoardScreen
 import io.github.wgd753.naturecollect.ui.calendar.CalendarScreen
 import io.github.wgd753.naturecollect.ui.camera.CameraScreen
 import io.github.wgd753.naturecollect.ui.collection.CollectionScreen
+import io.github.wgd753.naturecollect.ui.detail.CaptureDetailScreen
+import io.github.wgd753.naturecollect.ui.detail.SpeciesDetailScreen
 import io.github.wgd753.naturecollect.ui.globe.GlobeScreen
+import io.github.wgd753.naturecollect.ui.settings.SettingsScreen
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.InkSoft
+
+private const val SETTINGS_ROUTE = "settings"
 
 /** The five bottom tabs, in display order. */
 enum class Tab(val route: String, val label: String, val icon: ImageVector) {
@@ -47,22 +53,25 @@ fun NatureCollectApp() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val onTab = Tab.entries.any { tab -> currentDestination?.route == tab.route }
+    val openCapture: (String) -> Unit = { id -> navController.navigate("capture/$id") }
+    val selectTab: (Tab) -> Unit = { tab ->
+        navController.navigate(tab.route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = Card) {
+            if (onTab) NavigationBar(containerColor = Card) {
                 Tab.entries.forEach { tab ->
                     val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { selectTab(tab) },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label) },
                         colors = NavigationBarItemDefaults.colors(
@@ -83,10 +92,30 @@ fun NatureCollectApp() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(Tab.Board.route) { BoardScreen() }
-            composable(Tab.Camera.route) { CameraScreen() }
-            composable(Tab.Calendar.route) { CalendarScreen() }
-            composable(Tab.Globe.route) { GlobeScreen() }
-            composable(Tab.Collection.route) { CollectionScreen() }
+            composable(Tab.Camera.route) { CameraScreen(onOpenCapture = openCapture) }
+            composable(Tab.Calendar.route) { CalendarScreen(onOpenCapture = openCapture) }
+            composable(Tab.Globe.route) { GlobeScreen(onOpenCapture = openCapture) }
+            composable(Tab.Collection.route) {
+                CollectionScreen(
+                    onOpenSpecies = { key -> navController.navigate("species/" + Uri.encode(key)) },
+                    onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
+                )
+            }
+            composable("species/{key}") { entry ->
+                SpeciesDetailScreen(
+                    speciesKey = entry.arguments?.getString("key").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onOpenCapture = openCapture,
+                )
+            }
+            composable("capture/{id}") { entry ->
+                CaptureDetailScreen(
+                    captureId = entry.arguments?.getString("id").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onOpenBoard = { selectTab(Tab.Board) },
+                )
+            }
+            composable(SETTINGS_ROUTE) { SettingsScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

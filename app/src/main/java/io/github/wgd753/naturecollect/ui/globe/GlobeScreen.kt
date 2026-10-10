@@ -1,16 +1,231 @@
 package io.github.wgd753.naturecollect.ui.globe
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import io.github.wgd753.naturecollect.ui.EmptyState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.wgd753.naturecollect.data.Category
+import io.github.wgd753.naturecollect.data.MediaFiles
+import io.github.wgd753.naturecollect.data.db.CaptureEntity
+import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
+import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.theme.Card
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
+import kotlin.math.max
+import kotlin.math.roundToInt
 
+private const val STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
+private const val SOURCE_ID = "captures"
+private const val LAYER_ID = "captures-layer"
+
+/** Stickers pinned where they were found, on an OpenStreetMap base map. */
 @Composable
-fun GlobeScreen() {
-    Column(Modifier.fillMaxSize()) {
-        PageHeader("地图")
-        EmptyState("🗺️", "在地图上看你在哪里遇见了它们\n（v0.2 上线）")
+fun GlobeScreen(onOpenCapture: (String) -> Unit) {
+    val container = rememberContainer()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val captures by container.captures.observeAll().collectAsState(initial = emptyList())
+    var filter by rememberSaveable { mutableStateOf<Category?>(null) }
+    val located = captures.filter { it.latitude != null && it.longitude != null }
+    val shown = located.filter { filter == null || Category.fromKey(it.category) == filter }
+
+    val mapView = remember { MapView(context).apply { onCreate(null) } }
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var style by remember { mutableStateOf<Style?>(null) }
+    var recenter by remember { mutableIntStateOf(0) }
+    val openCapture by rememberUpdatedState(onOpenCapture)
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStart()
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onResume()
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
+        }
     }
+
+    LaunchedEffect(mapView) {
+        mapView.getMapAsync { m ->
+            map = m
+            m.uiSettings.isRotateGesturesEnabled = false
+            m.uiSettings.isCompassEnabled = false
+            m.cameraPosition = org.maplibre.android.camera.CameraPosition.Builder()
+                .target(LatLng(34.0, 108.0))
+                .zoom(3.0)
+                .build()
+            m.setStyle(Style.Builder().fromUri(STYLE_URL)) { loaded ->
+                loaded.addSource(GeoJsonSource(SOURCE_ID))
+                loaded.addLayer(
+                    SymbolLayer(LAYER_ID, SOURCE_ID).withProperties(
+                        PropertyFactory.iconImage(Expression.get("icon")),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconSize(
+                            Expression.interpolate(
+                                Expression.linear(),
+                                Expression.zoom(),
+                                Expression.stop(2, 0.45f),
+                                Expression.stop(10, 0.75f),
+                                Expression.stop(16, 1.0f),
+                            ),
+                        ),
+                    ),
+                )
+                style = loaded
+            }
+            m.addOnMapClickListener { point ->
+                val screen = m.projection.toScreenLocation(point)
+                val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
+                val id = hit?.getStringProperty("cid")
+                if (id != null) openCapture(id)
+                id != null
+            }
+        }
+    }
+
+    // Push the stickers into the map whenever the data or filter changes.
+    LaunchedEffect(style, shown) {
+        val s = style ?: return@LaunchedEffect
+        val icons = withContext(Dispatchers.IO) { shown.associate { it.id to markerBitmap(container.media, it) } }
+        icons.forEach { (id, bitmap) -> if (bitmap != null && s.getImage(id) == null) s.addImage(id, bitmap) }
+        val features = shown.filter { icons[it.id] != null }.map { capture ->
+            Feature.fromGeometry(Point.fromLngLat(capture.longitude!!, capture.latitude!!)).apply {
+                addStringProperty("icon", capture.id)
+                addStringProperty("cid", capture.id)
+            }
+        }
+        s.getSourceAs<GeoJsonSource>(SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
+
+    LaunchedEffect(map, style, recenter, filter) {
+        val m = map ?: return@LaunchedEffect
+        if (style == null) return@LaunchedEffect
+        fitTo(m, shown)
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        PageHeader("地图") {
+            Text(
+                "${located.map { "%.3f,%.3f".format(it.latitude, it.longitude) }.distinct().size} 个地点",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        CategoryFilterRow(selected = filter, onSelect = { filter = it })
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(16.dp)
+                .clip(RoundedCornerShape(24.dp)),
+        ) {
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+            IconButton(
+                onClick = { recenter++ },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .clip(CircleShape)
+                    .background(Card),
+            ) {
+                Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "看全部", tint = MaterialTheme.colorScheme.primary)
+            }
+            if (located.isEmpty()) {
+                Text(
+                    "带位置的收集会出现在这里\n拍照时允许定位就行",
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Card)
+                        .padding(12.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun fitTo(map: MapLibreMap, captures: List<CaptureEntity>) {
+    val points = captures.mapNotNull { c -> c.latitude?.let { LatLng(it, c.longitude!!) } }
+    when {
+        points.isEmpty() -> Unit
+        points.size == 1 -> map.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 14.0))
+        else -> {
+            val bounds = LatLngBounds.Builder().includes(points).build()
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+        }
+    }
+}
+
+/** A small copy of the sticker sized for the map (about 72dp tall on screen). */
+private fun markerBitmap(media: MediaFiles, capture: CaptureEntity): Bitmap? {
+    val file = media.file(capture.stickerFile)
+    if (!file.exists()) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    var sample = 1
+    while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 220) sample *= 2
+    val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+    val scale = 220f / max(decoded.width, decoded.height)
+    return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).roundToInt(), (decoded.height * scale).roundToInt(), true)
 }
