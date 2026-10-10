@@ -226,14 +226,6 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
                         onManage = onOpenCategories,
                         modifier = Modifier.padding(horizontal = 0.dp),
                     )
-                    if (!selecting && groups.isNotEmpty()) {
-                        Text(
-                            "长按卡片可以多选删除",
-                            modifier = Modifier.padding(start = 6.dp, top = 2.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
             items(shown, key = { it.key }) { group ->
@@ -305,66 +297,61 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
     }
 }
 
-/** Green summary card: species count, encounters, and a bar of how the collection splits by category. */
+/** Summary card: species count and encounters, with a quiet per-category tally. */
 @Composable
 private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, newThisMonth: Int) {
-    val counts = remember(groups) {
-        groups.groupingBy { it.category.key }.eachCount()
-    }
+    val counts = remember(groups) { groups.groupingBy { it.category.key }.eachCount() }
     val categories = Category.entries.filter { (counts[it.key] ?: 0) > 0 }
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(Forest, ForestDeep)))
+            .shadow(2.dp, RoundedCornerShape(26.dp), spotColor = Forest.copy(alpha = 0.3f))
+            .clip(RoundedCornerShape(26.dp))
+            .background(Card)
             .padding(20.dp),
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            AnimatedContent(
-                targetState = speciesCount,
-                transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
-                label = "speciesCount",
-            ) { n ->
-                Text("$n", color = Sun, fontSize = 52.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                AnimatedContent(
+                    targetState = speciesCount,
+                    transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
+                    label = "speciesCount",
+                ) { n ->
+                    Text("$n", color = Forest, fontSize = 46.sp, fontWeight = FontWeight.Black, lineHeight = 48.sp)
+                }
+                Text("种已收集", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             }
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.padding(bottom = 8.dp)) {
-                Text("种已收集", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "遇见 $total 次 · 本月新增 $newThisMonth 种",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
+            StatColumn("$total", "次遇见")
+            Spacer(Modifier.width(18.dp))
+            StatColumn("+$newThisMonth", "本月新种")
         }
         if (categories.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
-            // Proportional bar, one segment per category.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp)),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                categories.forEach { c ->
-                    Box(Modifier.weight((counts[c.key] ?: 0).toFloat()).fillMaxSize().background(c.tint))
-                }
-            }
-            Spacer(Modifier.height(10.dp))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 categories.forEach { c ->
                     Text(
-                        "${c.emoji} ${c.label} ${counts[c.key] ?: 0}",
-                        color = Color.White.copy(alpha = 0.85f),
+                        "${c.emoji} ${counts[c.key] ?: 0}",
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StatColumn(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
     }
 }
 

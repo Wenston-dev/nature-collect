@@ -37,8 +37,11 @@ class BoardRepository(private val dao: BoardDao) {
     suspend fun addSticker(boardId: String, captureId: String, x: Float, y: Float, rotation: Float): BoardItemEntity =
         add(boardId, BoardItemType.STICKER, captureId = captureId, x = x, y = y, rotation = rotation)
 
-    suspend fun addText(boardId: String, text: String, color: Long): BoardItemEntity =
-        add(boardId, BoardItemType.TEXT, text = text, color = color, x = 0.5f, y = 0.5f)
+    /** [font] is stored in pathData (unused for text): "hand", "round" or "serif". */
+    suspend fun addText(boardId: String, text: String, color: Long, font: String, scale: Float): BoardItemEntity =
+        add(boardId, BoardItemType.TEXT, text = text, color = color, pathData = font, x = 0.5f, y = 0.5f, scale = scale)
+
+    suspend fun updateItem(item: BoardItemEntity) = dao.upsertItem(item)
 
     suspend fun addImage(boardId: String, fileName: String, width: Int, height: Int): BoardItemEntity =
         add(
@@ -53,6 +56,8 @@ class BoardRepository(private val dao: BoardDao) {
 
     suspend fun addDrawing(boardId: String, pathData: String, color: Long): BoardItemEntity =
         add(boardId, BoardItemType.DRAWING, pathData = pathData, color = color, x = 0f, y = 0f)
+
+    suspend fun setColor(item: BoardItemEntity, color: Long) = dao.upsertItem(item.copy(color = color))
 
     /** Saves only position/size/angle so it can't clobber a concurrent z-order change. */
     suspend fun updateTransform(item: BoardItemEntity) =
@@ -75,6 +80,7 @@ class BoardRepository(private val dao: BoardDao) {
         x: Float,
         y: Float,
         rotation: Float = 0f,
+        scale: Float = 1f,
     ): BoardItemEntity {
         val item = BoardItemEntity(
             id = UUID.randomUUID().toString(),
@@ -86,7 +92,7 @@ class BoardRepository(private val dao: BoardDao) {
             color = color,
             x = x,
             y = y,
-            scale = 1f,
+            scale = scale,
             rotation = rotation,
             z = dao.maxZ(boardId) + 1,
         )

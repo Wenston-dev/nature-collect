@@ -1,6 +1,8 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.Manifest
+import android.provider.MediaStore
+import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import android.content.pm.PackageManager
@@ -188,9 +190,10 @@ private fun LiveCamera(vm: CameraViewModel) {
         if (wanted.isNotEmpty()) permissionLauncher.launch(wanted.toTypedArray())
     }
 
-    // The document picker (unlike the photo picker) can hand over the original
-    // file with its GPS tags, so imported photos keep where and when they were taken.
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    // Open the gallery app via ACTION_PICK on MediaStore: it returns a media URI,
+    // which (with ACCESS_MEDIA_LOCATION) still yields the original GPS tags.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
         if (uri != null) {
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
@@ -328,7 +331,9 @@ private fun LiveCamera(vm: CameraViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SideButton(Icons.Outlined.PhotoLibrary, "相册") {
-                picker.launch(arrayOf("image/*"))
+                picker.launch(
+                    Intent(Intent.ACTION_PICK).setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*"),
+                )
             }
             ShutterButton(enabled = hasCamera) {
                 scope.launch {

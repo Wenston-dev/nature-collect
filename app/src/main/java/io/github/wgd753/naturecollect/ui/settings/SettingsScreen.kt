@@ -43,6 +43,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.ui.theme.Card
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -139,6 +141,19 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedButton(onClick = onOpenCategories) { Text("管理分类") }
+            }
+
+            Section("地图底图") {
+                val source by container.settings.mapSource.collectAsState()
+                Text(
+                    "高德底图在国内加载快；OpenStreetMap 适合在国外用。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterPill("高德（国内）", selected = source == Settings.MAP_AMAP) { container.settings.setMapSource(Settings.MAP_AMAP) }
+                    FilterPill("OpenStreetMap", selected = source == Settings.MAP_OSM) { container.settings.setMapSource(Settings.MAP_OSM) }
+                }
             }
 
             Section("备份") {

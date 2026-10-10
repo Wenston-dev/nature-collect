@@ -39,7 +39,7 @@ import io.github.wgd753.naturecollect.ui.FilterPill
 @Composable
 fun ColumnScope.CutoutEditor(state: CutoutState) {
     Text(
-        text = if (state.erasing) "在多选进来的东西上划一下，把它擦掉" else "用手指圈出想收集的东西，或点一下",
+        text = if (state.erasing) "涂抹要擦掉的部分" else "圈出或点选",
         modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 6.dp),
         style = MaterialTheme.typography.titleMedium,
         color = if (state.erasing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,

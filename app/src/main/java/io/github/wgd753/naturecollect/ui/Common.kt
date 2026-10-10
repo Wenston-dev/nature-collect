@@ -54,7 +54,7 @@ import java.io.File
 @Composable
 fun rememberContainer(): AppContainer = (LocalContext.current.applicationContext as NatureApp).container
 
-/** Page title with a small coloured overline, and optional actions on the right. */
+/** Page title with optional actions on the right. */
 @Composable
 fun PageHeader(
     title: String,
@@ -68,28 +68,14 @@ fun PageHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column {
-            Text(
-                text = OVERLINES[title] ?: "NATURE",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
     }
 }
-
-private val OVERLINES = mapOf(
-    "图鉴" to "FIELD GUIDE",
-    "贴纸板" to "STICKER BOARD",
-    "日历" to "NATURE JOURNAL",
-    "地图" to "WHERE I MET THEM",
-)
 
 /** Round icon button on a soft tinted disc, used in page headers. */
 @Composable

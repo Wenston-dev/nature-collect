@@ -119,6 +119,11 @@ class CaptureRepository(
         )
     }
 
+    suspend fun updateDescription(id: String, description: String?) {
+        val capture = captureDao.get(id) ?: return
+        update(capture.copy(description = description?.trim()?.ifEmpty { null }))
+    }
+
     suspend fun updateNotes(id: String, placeName: String?, note: String?) {
         val capture = captureDao.get(id) ?: return
         update(capture.copy(placeName = placeName?.trim()?.ifEmpty { null }, note = note?.trim()?.ifEmpty { null }))

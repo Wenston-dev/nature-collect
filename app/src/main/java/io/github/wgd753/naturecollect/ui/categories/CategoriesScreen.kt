@@ -29,6 +29,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.ColorSwatchButton
 import io.github.wgd753.naturecollect.ui.tint
 
 private val Palette = listOf(
@@ -78,12 +82,6 @@ fun CategoriesScreen(onBack: () -> Unit) {
             Text("分类管理", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
             TextButton(onClick = { confirmReset = true }) { Text("恢复默认") }
         }
-        Text(
-            "拍照识别时，AI 会从这些分类里挑一个。可以给分类写一句说明，帮它分得更准。",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(16.dp),
@@ -188,6 +186,19 @@ fun CategoriesScreen(onBack: () -> Unit) {
     }
 }
 
+/** Keeps the first [count] user-perceived characters, so a multi-codepoint emoji stays whole. */
+private fun firstGraphemes(text: String, count: Int): String {
+    val it = java.text.BreakIterator.getCharacterInstance()
+    it.setText(text)
+    var end = 0
+    repeat(count) {
+        val next = it.next()
+        if (next == java.text.BreakIterator.DONE) return text
+        end = next
+    }
+    return text.substring(0, end)
+}
+
 private fun List<Category>.move(from: Int, to: Int): List<Category> {
     if (to !in indices) return this
     return toMutableList().apply { add(to, removeAt(from)) }
@@ -207,6 +218,7 @@ private fun CategoryDialog(
     var hint by remember { mutableStateOf(initial.hint.orEmpty()) }
     var color by remember { mutableStateOf(initial.color) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val emojiFocus = remember { FocusRequester() }
 
     if (confirmDelete && onDelete != null) {
         AlertDialog(
@@ -224,20 +236,28 @@ private fun CategoryDialog(
         title = { Text(if (isNew) "添加分类" else "编辑分类") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Any emoji works: type it with the keyboard's emoji panel, or pick a common one.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(52.dp).clip(CircleShape).background(Color(color).copy(alpha = 0.2f)),
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color(color).copy(alpha = 0.2f))
+                            .clickable { emojiFocus.requestFocus() },
                         contentAlignment = Alignment.Center,
-                    ) { Text(emoji, fontSize = 26.sp) }
+                    ) { Text(emoji.ifEmpty { "?" }, fontSize = 28.sp) }
                     Spacer(Modifier.width(10.dp))
                     OutlinedTextField(
                         value = emoji,
-                        onValueChange = { if (it.isNotEmpty()) emoji = it.take(8) },
-                        label = { Text("Emoji") },
+                        onValueChange = { emoji = firstGraphemes(it, 2) },
+                        label = { Text("自定义 emoji") },
+                        placeholder = { Text("用表情键盘输入") },
                         singleLine = true,
-                        modifier = Modifier.width(110.dp),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 22.sp),
+                        modifier = Modifier.weight(1f).focusRequester(emojiFocus),
                     )
                 }
+                Text("常用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     EmojiPicks.forEach { e ->
                         Text(
@@ -255,10 +275,11 @@ private fun CategoryDialog(
                 OutlinedTextField(
                     value = hint,
                     onValueChange = { hint = it.take(60) },
-                    label = { Text("说明（可选，给 AI 看）") },
+                    label = { Text("识别提示（可选）") },
                     placeholder = { Text("例如：各种石头和矿物") },
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ColorSwatchButton(color, "分类颜色", onPick = { color = it }, size = 28.dp)
                     Palette.forEach { c ->
                         Box(
                             Modifier
@@ -275,7 +296,7 @@ private fun CategoryDialog(
         confirmButton = {
             TextButton(
                 enabled = label.isNotBlank(),
-                onClick = { onSave(initial.copy(label = label.trim(), emoji = emoji.trim(), hint = hint.trim().ifEmpty { null }, color = color)) },
+                onClick = { onSave(initial.copy(label = label.trim(), emoji = emoji.trim().ifEmpty { "✨" }, hint = hint.trim().ifEmpty { null }, color = color)) },
             ) { Text("保存") }
         },
         dismissButton = {

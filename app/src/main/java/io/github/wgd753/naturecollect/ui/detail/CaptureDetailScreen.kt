@@ -102,6 +102,7 @@ fun CaptureDetailScreen(
     var showPhoto by remember { mutableStateOf(false) }
     var editingName by remember { mutableStateOf(false) }
     var editingNotes by remember { mutableStateOf(false) }
+    var editingDescription by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val all by container.captures.observeAll().collectAsState(initial = emptyList())
 
@@ -217,11 +218,6 @@ fun CaptureDetailScreen(
                     }
                 }
             }
-            Text(
-                if (showPhoto) "点一下看贴纸" else "点一下看原图",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(c.displayName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
@@ -238,11 +234,23 @@ fun CaptureDetailScreen(
             )
             Spacer(Modifier.height(8.dp))
             RecognitionLine(c) { scope.launch { container.recognition.retry(c.id) } }
-            c.description?.let {
-                Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Card)
+                    .clickable { editingDescription = true }
+                    .padding(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("简介", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Icon(Icons.Outlined.Edit, contentDescription = "编辑简介", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    it,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Card).padding(16.dp),
+                    c.description ?: "还没有简介，点这里写一句，或者让 AI 帮你写",
+                    color = if (c.description != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             val alternatives = c.alternatives?.split('|')?.filter { it.isNotBlank() }.orEmpty()
@@ -284,6 +292,12 @@ fun CaptureDetailScreen(
         RenameDialog(c, onDismiss = { editingName = false }) { name, sci, category, description ->
             editingName = false
             renameWithUndo(c, name) { container.captures.rename(c.id, name, category, sci, description) }
+        }
+    }
+    if (editingDescription && c != null) {
+        DescriptionDialog(c, onDismiss = { editingDescription = false }) { text ->
+            editingDescription = false
+            scope.launch { container.captures.updateDescription(c.id, text) }
         }
     }
     if (editingNotes && c != null) {
@@ -365,13 +379,15 @@ private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        rows.forEach { (label, value) ->
-            Row {
+        rows.forEachIndexed { i, (label, value) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(label, modifier = Modifier.padding(end = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value)
+                Text(value, modifier = Modifier.weight(1f))
+                if (i == 0) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                }
             }
         }
-        Text("点这里编辑地点和笔记", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
     }
 }
 
@@ -455,16 +471,16 @@ private fun RenameDialog(
             if (!categoryTouched) category = result.category
             description = result.description
             status = when {
-                keepTarget -> "另一个名字是你手填的，没有覆盖；点「立即翻译」可以替换"
-                target == NameField.SCI && result.nameSci == null -> "没找到对应的英文名 / 学名"
-                else -> "已自动翻译，可以再改"
+                keepTarget -> "保留了你手填的名字"
+                target == NameField.SCI && result.nameSci == null -> "没找到英文名"
+                else -> "已翻译"
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: RecognitionException) {
             status = e.message
         } catch (e: Exception) {
-            status = "翻译失败，可以手动填写"
+            status = "翻译失败"
         } finally {
             translating = null
         }
@@ -541,6 +557,56 @@ private fun RenameDialog(
         confirmButton = {
             TextButton(onClick = { onSave(zh, sci, category, description) }, enabled = zh.isNotBlank()) { Text("保存") }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+/** Write the blurb by hand, or ask DeepSeek for one based on the name. */
+@Composable
+private fun DescriptionDialog(capture: CaptureEntity, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var text by remember { mutableStateOf(capture.description.orEmpty()) }
+    var writing by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("简介") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.take(200) },
+                    minLines = 3,
+                    placeholder = { Text("写一句关于它的介绍") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        enabled = !writing && capture.nameZh != null,
+                        onClick = {
+                            writing = true
+                            status = null
+                            scope.launch {
+                                try {
+                                    val result = container.recognition.lookupName(capture.nameZh.orEmpty())
+                                    result.description?.let { text = it } ?: run { status = "AI 没有写出来，再试一次" }
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    status = e.message ?: "生成失败"
+                                } finally {
+                                    writing = false
+                                }
+                            }
+                        },
+                    ) { Text("✨ 让 AI 写一句") }
+                    if (writing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                }
+                status?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("保存") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }

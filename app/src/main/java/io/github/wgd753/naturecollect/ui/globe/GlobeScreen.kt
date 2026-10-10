@@ -205,10 +205,6 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.width(8.dp))
-            FilterPill(if (amap) "高德" else "OSM", selected = true) {
-                container.settings.setMapSource(if (amap) Settings.MAP_OSM else Settings.MAP_AMAP)
-            }
         }
         CategoryFilterRow(selected = filter, onSelect = { filter = it })
         Box(
@@ -231,7 +227,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
             }
             if (loadFailed) {
                 Text(
-                    if (amap) "地图加载失败，请检查网络，或点右上角切换到 OSM" else "OSM 地图在国内可能连不上，点右上角切换到高德",
+                    if (amap) "地图加载失败，请检查网络" else "OpenStreetMap 在国内可能连不上，可以在设置里换回高德底图",
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(24.dp)

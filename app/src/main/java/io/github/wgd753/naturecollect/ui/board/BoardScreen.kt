@@ -1,6 +1,39 @@
 package io.github.wgd753.naturecollect.ui.board
 
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EmojiNature
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FlipToFront
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
+import io.github.wgd753.naturecollect.export.Gallery
+import io.github.wgd753.naturecollect.ui.ColorPicker
+import io.github.wgd753.naturecollect.ui.ColorSwatchButton
+import io.github.wgd753.naturecollect.ui.HeaderIconButton
+import io.github.wgd753.naturecollect.ui.QuickColors
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -125,11 +158,12 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private val BackgroundColors = listOf(0xFFF8F6F1, 0xFFE9E4DA, 0xFFFBE9E4, 0xFFE8F1E4, 0xFFE4EDF7, 0xFFEDE8F6)
-private val InkColors = listOf(0xFF1F2FC8, 0xFF2E5E3B, 0xFFD2452F, 0xFF2B2A28, 0xFFE59A1F, 0xFFFFFFFF)
-
 /** Sticker width on the board at scale 1, as a fraction of the board width. */
 private const val STICKER_BASE = 0.3f
+
+private enum class Tool { MOVE, PEN }
+
+private enum class Sheet { STICKERS, BACKGROUND }
 
 @Composable
 fun BoardScreen() {
@@ -139,79 +173,22 @@ fun BoardScreen() {
     val captures by container.captures.observeAll().collectAsState(initial = emptyList())
     var selectedBoardId by rememberSaveable { mutableStateOf<String?>(null) }
     val board = boards.firstOrNull { it.id == selectedBoardId } ?: boards.firstOrNull()
-
-    var showNewBoard by remember { mutableStateOf(false) }
-    var showBoardMenu by remember { mutableStateOf(false) }
     var fullscreen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { container.boards.ensureDefaultBoard() }
+    if (board == null) return
 
-    Column(Modifier.fillMaxSize()) {
-        PageHeader("贴纸板")
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = { showNewBoard = true },
-                modifier = Modifier.clip(CircleShape).background(Card),
-            ) { Icon(Icons.Outlined.Add, contentDescription = "新画板", tint = MaterialTheme.colorScheme.primary) }
-            boards.forEach { b ->
-                FilterPill(b.name, selected = b.id == board?.id) {
-                    if (b.id == board?.id) showBoardMenu = true else selectedBoardId = b.id
-                }
-            }
-        }
-        if (board == null) return@Column
-        if (!fullscreen) {
-            BoardEditor(
-                board,
-                captures,
-                onBoardChange = { scope.launch { container.boards.updateBoard(it) } },
-                fullscreen = false,
-                onToggleFullscreen = { fullscreen = true },
-            )
-        }
-    }
-
-    if (fullscreen && board != null) {
-        Dialog(
-            onDismissRequest = { fullscreen = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        ) {
-            Box(Modifier.fillMaxSize().background(Paper).systemBarsPadding()) {
-                BoardEditor(
-                    board,
-                    captures,
-                    onBoardChange = { scope.launch { container.boards.updateBoard(it) } },
-                    fullscreen = true,
-                    onToggleFullscreen = { fullscreen = false },
-                )
-            }
-        }
-    }
-
-    if (showNewBoard) {
-        NameDialog(title = "新画板", initial = "", onDismiss = { showNewBoard = false }) { name ->
-            showNewBoard = false
-            scope.launch { selectedBoardId = container.boards.createBoard(name).id }
-        }
-    }
-    if (showBoardMenu && board != null) {
-        BoardMenuDialog(
+    val editor: @Composable (Boolean) -> Unit = { isFullscreen ->
+        BoardEditor(
             board = board,
-            canDelete = boards.size > 1,
-            onDismiss = { showBoardMenu = false },
-            onRename = { name ->
-                showBoardMenu = false
-                scope.launch { container.boards.updateBoard(board.copy(name = name)) }
-            },
-            onDelete = {
-                showBoardMenu = false
+            boards = boards,
+            captures = captures,
+            fullscreen = isFullscreen,
+            onToggleFullscreen = { fullscreen = !fullscreen },
+            onSelectBoard = { selectedBoardId = it },
+            onNewBoard = { name -> scope.launch { selectedBoardId = container.boards.createBoard(name).id } },
+            onBoardChange = { scope.launch { container.boards.updateBoard(it) } },
+            onDeleteBoard = {
                 scope.launch {
                     container.boards.deleteBoard(board)
                     selectedBoardId = null
@@ -219,17 +196,29 @@ fun BoardScreen() {
             },
         )
     }
+    if (!fullscreen) editor(false)
+    if (fullscreen) {
+        Dialog(
+            onDismissRequest = { fullscreen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            Box(Modifier.fillMaxSize().background(Paper).systemBarsPadding()) { editor(true) }
+        }
+    }
 }
 
-private enum class Tool { MOVE, PEN }
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun BoardEditor(
     board: BoardEntity,
+    boards: List<BoardEntity>,
     captures: List<CaptureEntity>,
-    onBoardChange: (BoardEntity) -> Unit,
     fullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
+    onSelectBoard: (String) -> Unit,
+    onNewBoard: (String) -> Unit,
+    onBoardChange: (BoardEntity) -> Unit,
+    onDeleteBoard: () -> Unit,
 ) {
     val container = rememberContainer()
     val context = LocalContext.current
@@ -238,13 +227,14 @@ private fun BoardEditor(
     val captureById = remember(captures) { captures.associateBy { it.id } }
     var selectedItemId by remember(board.id) { mutableStateOf<String?>(null) }
     var tool by remember { mutableStateOf(Tool.MOVE) }
-    var penColor by remember { mutableStateOf(InkColors.first()) }
+    var penColor by remember { mutableLongStateOf(0xFF1F5B45) }
+    var penWidth by remember { mutableFloatStateOf(4f) }
+    var sheet by remember { mutableStateOf<Sheet?>(null) }
     var showTextDialog by remember { mutableStateOf(false) }
-    val exportLayer = rememberGraphicsLayer()
-    // In full screen the board gets the room; trays fold away until asked for.
-    var showTray by remember(fullscreen) { mutableStateOf(!fullscreen) }
-    var showBackground by remember(fullscreen) { mutableStateOf(!fullscreen) }
     var importPhoto by remember { mutableStateOf<Bitmap?>(null) }
+    val exportLayer = rememberGraphicsLayer()
+    val selectedItem = items.firstOrNull { it.id == selectedItemId }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -253,109 +243,42 @@ private fun BoardEditor(
             }
         }
     }
-    BackHandler(enabled = tool == Tool.PEN) { tool = Tool.MOVE }
+    BackHandler(enabled = tool == Tool.PEN || selectedItemId != null) {
+        tool = Tool.MOVE
+        selectedItemId = null
+    }
+
+    fun addSticker(capture: CaptureEntity) {
+        scope.launch {
+            val item = container.boards.addSticker(
+                board.id,
+                capture.id,
+                x = 0.3f + Random.nextFloat() * 0.4f,
+                y = 0.3f + Random.nextFloat() * 0.4f,
+                rotation = Random.nextFloat() * 16f - 8f,
+            )
+            selectedItemId = item.id
+            tool = Tool.MOVE
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
-        if (fullscreen) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                IconButton(onClick = onToggleFullscreen) {
-                    Icon(Icons.Outlined.FullscreenExit, contentDescription = "退出全屏", tint = MaterialTheme.colorScheme.primary)
-                }
-                Text(
-                    board.name,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
-                FilterPill("背景", selected = showBackground) { showBackground = !showBackground }
-                FilterPill("素材", selected = showTray) { showTray = !showTray }
-            }
-        }
-        // Background colour and pattern.
-        AnimatedVisibility(showBackground, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        // Header: the board's name doubles as the board switcher.
         Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BackgroundColors.forEach { color ->
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(Color(color))
-                        .border(if (board.backgroundColor == color) 3.dp else 1.dp, if (board.backgroundColor == color) MaterialTheme.colorScheme.primary else InkSoft, CircleShape)
-                        .clickable { onBoardChange(board.copy(backgroundColor = color)) },
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            listOf("空白", "点阵", "方格").forEachIndexed { index, label ->
-                FilterPill(label, selected = board.pattern == index) { onBoardChange(board.copy(pattern = index)) }
-            }
-        }
-        }
-
-        // Asset tray: every sticker collected so far, plus importing from the gallery.
-        AnimatedVisibility(showTray, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-        Column {
-        if (!fullscreen) {
-            Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("素材 ${captures.size}", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.weight(1f))
-                Text("点一下贴到画板上", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item(key = "import") {
-                Column(
-                    Modifier
-                        .size(if (fullscreen) 60.dp else 72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                        .border(1.5.dp, InkSoft, RoundedCornerShape(16.dp))
-                        .clickable { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("相册", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            BoardSwitcher(board, boards, onSelectBoard, onNewBoard, onRename = { onBoardChange(board.copy(name = it)) }, onDelete = onDeleteBoard)
+            Spacer(Modifier.weight(1f))
+            HeaderIconButton(if (fullscreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (fullscreen) "退出全屏" else "全屏", onClick = onToggleFullscreen)
+            HeaderIconButton(Icons.Outlined.FileDownload, "保存到相册") {
+                selectedItemId = null
+                scope.launch {
+                    val bitmap = exportLayer.toImageBitmap().asAndroidBitmap()
+                    val where = withContext(Dispatchers.IO) { Gallery.save(context, bitmap, board.name) }
+                    Toast.makeText(context, "已保存到$where", Toast.LENGTH_SHORT).show()
                 }
             }
-            items(captures, key = { it.id }) { capture ->
-                Box(
-                    Modifier
-                        .size(if (fullscreen) 60.dp else 72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Card)
-                        .clickable {
-                            scope.launch {
-                                val item = container.boards.addSticker(
-                                    board.id,
-                                    capture.id,
-                                    x = 0.3f + Random.nextFloat() * 0.4f,
-                                    y = 0.3f + Random.nextFloat() * 0.4f,
-                                    rotation = Random.nextFloat() * 16f - 8f,
-                                )
-                                selectedItemId = item.id
-                                tool = Tool.MOVE
-                            }
-                        }
-                        .padding(6.dp),
-                ) { StickerImage(capture, Modifier.fillMaxSize()) }
-            }
-        }
-        }
         }
 
         // The board itself.
@@ -363,6 +286,7 @@ private fun BoardEditor(
             BoxWithConstraints(
                 Modifier
                     .aspectRatio(3f / 4f)
+                    .shadow(4.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
                     .drawWithContent {
                         exportLayer.record { this@drawWithContent.drawContent() }
@@ -390,90 +314,144 @@ private fun BoardEditor(
                             boardHeight = heightPx,
                             selected = item.id == selectedItemId,
                             enabled = tool == Tool.MOVE,
-                            onSelect = {
-                                selectedItemId = item.id
-                                scope.launch { container.boards.bringToFront(item) }
-                            },
+                            onSelect = { selectedItemId = item.id },
                             onCommit = { scope.launch { container.boards.updateTransform(it) } },
                         )
                     }
                 }
                 if (tool == Tool.PEN) {
-                    PenLayer(widthPx, heightPx, Color(penColor)) { pathData ->
+                    PenLayer(widthPx, heightPx, Color(penColor), penWidth) { pathData ->
                         scope.launch { container.boards.addDrawing(board.id, pathData, penColor) }
                     }
                 }
                 if (items.isEmpty() && tool == Tool.MOVE) {
-                    EmptyState("🧩", if (captures.isEmpty()) "先去拍几张贴纸吧" else "从上面挑贴纸贴上来\n拖动、双指缩放和旋转")
+                    Text(
+                        "🧩",
+                        modifier = Modifier.align(Alignment.Center),
+                        fontSize = 40.sp,
+                    )
                 }
             }
         }
 
-        // Bottom tools.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = {
-                selectedItemId?.let { id -> scope.launch { container.boards.deleteItem(id) } }
-                selectedItemId = null
-            }, enabled = selectedItemId != null) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "删除选中",
-                    tint = if (selectedItemId != null) MaterialTheme.colorScheme.error else InkSoft,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            ToolButton(selected = false, onClick = { showTextDialog = true }) {
-                Text("Aa", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.width(12.dp))
-            ToolButton(selected = tool == Tool.PEN, onClick = {
-                tool = if (tool == Tool.PEN) Tool.MOVE else Tool.PEN
-                selectedItemId = null
-            }) {
-                Icon(Icons.Outlined.Draw, contentDescription = "画笔", tint = if (tool == Tool.PEN) Color.White else MaterialTheme.colorScheme.primary)
-            }
-            if (tool == Tool.PEN) {
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = {
-                    items.lastOrNull { it.type == BoardItemType.DRAWING }?.let { scope.launch { container.boards.deleteItem(it.id) } }
-                }) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "撤销一笔", tint = MaterialTheme.colorScheme.primary) }
-            }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onToggleFullscreen) {
-                Icon(
-                    if (fullscreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
-                    contentDescription = if (fullscreen) "退出全屏" else "全屏编辑",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = {
-                selectedItemId = null
-                scope.launch {
-                    val bitmap = exportLayer.toImageBitmap().asAndroidBitmap()
-                    val where = withContext(Dispatchers.IO) { io.github.wgd753.naturecollect.export.Gallery.save(context, bitmap, board.name) }
-                    Toast.makeText(context, "已保存到$where", Toast.LENGTH_SHORT).show()
-                }
-            }) { Icon(Icons.Outlined.FileDownload, contentDescription = "导出图片", tint = MaterialTheme.colorScheme.primary) }
+        // One bar at a time: tools, the selected item's actions, or the pen's settings.
+        val mode = when {
+            tool == Tool.PEN -> 2
+            selectedItem != null -> 1
+            else -> 0
         }
-        if (tool == Tool.PEN) {
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                InkColors.forEach { color ->
-                    Box(
-                        Modifier
-                            .padding(horizontal = 6.dp)
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(color))
-                            .border(if (penColor == color) 3.dp else 1.dp, if (penColor == color) MaterialTheme.colorScheme.primary else InkSoft, CircleShape)
-                            .clickable { penColor = color },
+        AnimatedContent(
+            targetState = mode,
+            transitionSpec = { (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { it / 2 } + fadeOut()) },
+            label = "boardBar",
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        ) { m ->
+            when (m) {
+                2 -> Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ColorSwatchButton(penColor, "画笔颜色", onPick = { penColor = it })
+                    Slider(
+                        value = penWidth,
+                        onValueChange = { penWidth = it },
+                        valueRange = 2f..16f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                     )
+                    IconButton(onClick = {
+                        items.lastOrNull { it.type == BoardItemType.DRAWING }?.let { scope.launch { container.boards.deleteItem(it.id) } }
+                    }) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "撤销一笔", tint = MaterialTheme.colorScheme.primary) }
+                    IconButton(onClick = { tool = Tool.MOVE }) {
+                        Icon(Icons.Outlined.Check, contentDescription = "完成", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
+                1 -> Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val item = selectedItem
+                    if (item?.type == BoardItemType.TEXT) {
+                        ColorSwatchButton(item.color, "文字颜色", onPick = { c -> scope.launch { container.boards.setColor(item, c) } })
+                    }
+                    IconButton(onClick = { item?.let { scope.launch { container.boards.bringToFront(it) } } }) {
+                        Icon(Icons.Outlined.FlipToFront, contentDescription = "放到最上层", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = {
+                        item?.let { scope.launch { container.boards.deleteItem(it.id) } }
+                        selectedItemId = null
+                    }) { Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除", tint = MaterialTheme.colorScheme.error) }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { selectedItemId = null }) {
+                        Icon(Icons.Outlined.Check, contentDescription = "完成", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                else -> Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(6.dp),
+                ) {
+                    BarTool(Icons.Outlined.EmojiNature, "贴纸") { sheet = Sheet.STICKERS }
+                    BarTool(Icons.Outlined.TextFields, "文字") { showTextDialog = true }
+                    BarTool(Icons.Outlined.Draw, "画笔") {
+                        tool = Tool.PEN
+                        selectedItemId = null
+                    }
+                    BarTool(Icons.Outlined.Palette, "背景") { sheet = Sheet.BACKGROUND }
+                }
+            }
+        }
+    }
+
+    if (sheet != null) {
+        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = Paper) {
+            when (sheet) {
+                Sheet.STICKERS -> LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.heightIn(max = 460.dp),
+                ) {
+                    item(key = "import") {
+                        Box(
+                            Modifier
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    sheet = null
+                                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "从相册导入", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    items(captures, key = { it.id }) { capture ->
+                        Box(
+                            Modifier
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Card)
+                                .clickable {
+                                    sheet = null
+                                    addSticker(capture)
+                                }
+                                .padding(6.dp),
+                        ) { StickerImage(capture, Modifier.fillMaxSize()) }
+                    }
+                }
+                Sheet.BACKGROUND -> Column(
+                    Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("空白", "点阵", "方格").forEachIndexed { index, label ->
+                            FilterPill(label, selected = board.pattern == index) { onBoardChange(board.copy(pattern = index)) }
+                        }
+                    }
+                    ColorPicker(board.backgroundColor, onChange = { onBoardChange(board.copy(backgroundColor = it)) })
+                }
+                null -> Unit
             }
         }
     }
@@ -491,10 +469,10 @@ private fun BoardEditor(
     }
 
     if (showTextDialog) {
-        TextDialog(onDismiss = { showTextDialog = false }) { text, color ->
+        TextDialog(onDismiss = { showTextDialog = false }) { text, color, font, scale ->
             showTextDialog = false
             scope.launch {
-                selectedItemId = container.boards.addText(board.id, text, color).id
+                selectedItemId = container.boards.addText(board.id, text, color, font, scale).id
                 tool = Tool.MOVE
             }
         }
@@ -502,15 +480,104 @@ private fun BoardEditor(
 }
 
 @Composable
-private fun ToolButton(selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
+private fun RowScope.BarTool(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
         Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else Card)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { content() }
+            .weight(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** Board name with a menu: switch boards, add, rename or delete. */
+@Composable
+private fun BoardSwitcher(
+    board: BoardEntity,
+    boards: List<BoardEntity>,
+    onSelect: (String) -> Unit,
+    onNew: (String) -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf<String?>(null) } // "new" or "rename"
+    var confirmDelete by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier.clip(RoundedCornerShape(14.dp)).clickable { open = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(board.name, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground, maxLines = 1)
+            Icon(Icons.Outlined.ExpandMore, contentDescription = "切换画板", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            boards.forEach { b ->
+                DropdownMenuItem(
+                    text = { Text(b.name, fontWeight = if (b.id == board.id) FontWeight.Bold else FontWeight.Normal) },
+                    leadingIcon = { if (b.id == board.id) Icon(Icons.Outlined.Check, contentDescription = null) },
+                    onClick = {
+                        open = false
+                        onSelect(b.id)
+                    },
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text("新画板") }, leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) }, onClick = {
+                open = false
+                naming = "new"
+            })
+            DropdownMenuItem(text = { Text("重命名") }, leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }, onClick = {
+                open = false
+                naming = "rename"
+            })
+            if (boards.size > 1) {
+                DropdownMenuItem(
+                    text = { Text("删除画板", color = MaterialTheme.colorScheme.error) },
+                    leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                    onClick = {
+                        open = false
+                        confirmDelete = true
+                    },
+                )
+            }
+        }
+    }
+    naming?.let { mode ->
+        NameDialog(
+            title = if (mode == "new") "新画板" else "重命名",
+            initial = if (mode == "new") "" else board.name,
+            onDismiss = { naming = null },
+        ) { name ->
+            naming = null
+            if (mode == "new") onNew(name) else onRename(name)
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("删除「${board.name}」？") },
+            text = { Text("贴纸本身还在图鉴里。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+        )
+    }
+}
+
+/** Text fonts, stored by key on the item. */
+private fun fontFor(key: String?): FontFamily = when (key) {
+    "round" -> FontFamily.SansSerif
+    "serif" -> FontFamily.Serif
+    else -> FontFamily.Cursive
 }
 
 /**
@@ -617,7 +684,7 @@ private fun TransformableItem(
                 text = item.text.orEmpty(),
                 modifier = outline.padding(horizontal = 8.dp, vertical = 4.dp),
                 color = Color(item.color),
-                fontFamily = FontFamily.Cursive,
+                fontFamily = fontFor(item.pathData),
                 fontWeight = FontWeight.Bold,
                 fontSize = 26.sp,
             )
@@ -636,17 +703,17 @@ private fun TransformableItem(
 
 @Composable
 private fun DrawingItem(item: BoardItemEntity, boardWidth: Float, boardHeight: Float) {
-    val points = remember(item.pathData) { decodePath(item.pathData) }
+    val (width, points) = remember(item.pathData) { decodeStroke(item.pathData) }
     Box(
         Modifier
             .fillMaxSize()
-            .drawBehind { drawStroke(points.map { Offset(it.x * boardWidth, it.y * boardHeight) }, Color(item.color)) },
+            .drawBehind { drawStroke(points.map { Offset(it.x * boardWidth, it.y * boardHeight) }, Color(item.color), width) },
     )
 }
 
 /** Captures a freehand stroke and hands it back as board-relative points. */
 @Composable
-private fun PenLayer(boardWidth: Float, boardHeight: Float, color: Color, onStroke: (String) -> Unit) {
+private fun PenLayer(boardWidth: Float, boardHeight: Float, color: Color, width: Float, onStroke: (String) -> Unit) {
     val current = remember { mutableStateListOf<Offset>() }
     Box(
         Modifier
@@ -657,15 +724,27 @@ private fun PenLayer(boardWidth: Float, boardHeight: Float, color: Color, onStro
                     onDrag = { change, _ -> change.consume(); current.add(change.position) },
                     onDragEnd = {
                         if (current.size > 1) {
-                            onStroke(current.joinToString(";") { "%.4f,%.4f".format(java.util.Locale.US, it.x / boardWidth, it.y / boardHeight) })
+                            val points = current.joinToString(";") { "%.4f,%.4f".format(java.util.Locale.US, it.x / boardWidth, it.y / boardHeight) }
+                            onStroke("w=%.1f#".format(java.util.Locale.US, width) + points)
                         }
                         current.clear()
                     },
                     onDragCancel = { current.clear() },
                 )
             }
-            .drawBehind { drawStroke(current.toList(), color) },
+            .drawBehind { drawStroke(current.toList(), color, width) },
     )
+}
+
+/** "w=6.0#x,y;x,y…" (older strokes have no width prefix and default to 4dp). */
+private fun decodeStroke(data: String?): Pair<Float, List<Offset>> {
+    val raw = data.orEmpty()
+    val hash = raw.indexOf('#')
+    if (raw.startsWith("w=") && hash > 0) {
+        val width = raw.substring(2, hash).toFloatOrNull() ?: 4f
+        return width to decodePath(raw.substring(hash + 1))
+    }
+    return 4f to decodePath(raw)
 }
 
 private fun decodePath(data: String?): List<Offset> =
@@ -674,7 +753,7 @@ private fun decodePath(data: String?): List<Offset> =
         if (parts.size != 2) null else Offset(parts[0].toFloatOrNull() ?: return@mapNotNull null, parts[1].toFloatOrNull() ?: return@mapNotNull null)
     }
 
-private fun DrawScope.drawStroke(points: List<Offset>, color: Color) {
+private fun DrawScope.drawStroke(points: List<Offset>, color: Color, widthDp: Float = 4f) {
     if (points.size < 2) return
     val path = Path().apply {
         moveTo(points[0].x, points[0].y)
@@ -686,7 +765,7 @@ private fun DrawScope.drawStroke(points: List<Offset>, color: Color) {
         }
         lineTo(points.last().x, points.last().y)
     }
-    drawPath(path, color, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    drawPath(path, color, style = Stroke(width = widthDp.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 }
 
 private fun DrawScope.drawPattern(pattern: Int) {
@@ -720,30 +799,47 @@ private fun DrawScope.drawPattern(pattern: Int) {
 }
 
 @Composable
-private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long) -> Unit) {
+private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Float) -> Unit) {
     var text by remember { mutableStateOf("") }
-    var color by remember { mutableStateOf(InkColors.first()) }
+    var color by remember { mutableLongStateOf(0xFF1F5B45) }
+    var font by remember { mutableStateOf("hand") }
+    var size by remember { mutableFloatStateOf(1f) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("写点什么") },
+        title = { Text("文字") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = text, onValueChange = { text = it }, placeholder = { Text("例如：春天的公园") })
+                OutlinedTextField(value = text, onValueChange = { text = it }, placeholder = { Text("写点什么") })
+                Text(
+                    text.ifBlank { "预览" },
+                    color = Color(color),
+                    fontFamily = fontFor(font),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (22 * size).sp,
+                    maxLines = 2,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InkColors.filter { it != 0xFFFFFFFF }.forEach { c ->
+                    listOf("hand" to "手写", "round" to "圆体", "serif" to "衬线").forEach { (key, label) ->
+                        FilterPill(label, selected = font == key) { font = key }
+                    }
+                }
+                Slider(value = size, onValueChange = { size = it }, valueRange = 0.6f..2.2f)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ColorSwatchButton(color, "文字颜色", onPick = { color = it }, size = 30.dp)
+                    QuickColors.take(8).forEach { c ->
                         Box(
                             Modifier
-                                .size(28.dp)
+                                .size(24.dp)
                                 .clip(CircleShape)
                                 .background(Color(c))
-                                .border(if (color == c) 3.dp else 0.dp, InkSoft, CircleShape)
+                                .border(if (color == c) 3.dp else 1.dp, if (color == c) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.12f), CircleShape)
                                 .clickable { color = c },
                         )
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onAdd(text.trim(), color) }, enabled = text.isNotBlank()) { Text("贴上去") } },
+        confirmButton = { TextButton(onClick = { onAdd(text.trim(), color, font, size) }, enabled = text.isNotBlank()) { Text("贴上去") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }
@@ -757,43 +853,5 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
         text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text("画板名字") }) },
         confirmButton = { TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("好") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
-}
-
-@Composable
-private fun BoardMenuDialog(
-    board: BoardEntity,
-    canDelete: Boolean,
-    onDismiss: () -> Unit,
-    onRename: (String) -> Unit,
-    onDelete: () -> Unit,
-) {
-    var name by remember { mutableStateOf(board.name) }
-    var confirm by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.MoreHoriz, contentDescription = null) },
-        title = { Text(if (confirm) "删除「${board.name}」？" else "画板设置") },
-        text = {
-            if (confirm) {
-                Text("画板上的排版会删除，贴纸本身还在图鉴里。")
-            } else {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text("名字") })
-            }
-        },
-        confirmButton = {
-            if (confirm) {
-                TextButton(onClick = onDelete) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            } else {
-                TextButton(onClick = { onRename(name.trim()) }, enabled = name.isNotBlank()) { Text("保存") }
-            }
-        },
-        dismissButton = {
-            if (!confirm && canDelete) {
-                TextButton(onClick = { confirm = true }) { Text("删除画板", color = MaterialTheme.colorScheme.error) }
-            } else {
-                TextButton(onClick = onDismiss) { Text("取消") }
-            }
-        },
     )
 }
