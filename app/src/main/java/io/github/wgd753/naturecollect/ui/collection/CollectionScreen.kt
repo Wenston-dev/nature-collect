@@ -394,7 +394,7 @@ private fun SpeciesCell(
     )
     val cover = group.cover
     val recognizing = cover.status == RecognitionStatus.PENDING || cover.status == RecognitionStatus.RUNNING
-    val accent = group.category.tint
+    val accent = rememberStickerTint(cover, fallback = group.category.tint)
 
     Column(
         modifier = modifier
@@ -421,7 +421,7 @@ private fun SpeciesCell(
                 .padding(8.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(
-                    Brush.radialGradient(listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.06f))),
+                    Brush.radialGradient(listOf(accent.copy(alpha = 0.24f), accent.copy(alpha = 0.07f))),
                 ),
         ) {
             StickerImage(
