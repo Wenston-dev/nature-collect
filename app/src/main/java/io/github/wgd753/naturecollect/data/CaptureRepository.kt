@@ -129,6 +129,15 @@ class CaptureRepository(
         update(capture.copy(placeName = placeName?.trim()?.ifEmpty { null }, note = note?.trim()?.ifEmpty { null }))
     }
 
+    /** Swaps in a newly cut sticker; a fresh file name keeps image caches from showing the old one. */
+    suspend fun replaceSticker(id: String, sticker: Bitmap) = withContext(Dispatchers.IO) {
+        val capture = captureDao.get(id) ?: return@withContext
+        val name = "$id-sticker-${System.currentTimeMillis().toString(36)}.png"
+        media.savePng(name, sticker)
+        update(capture.copy(stickerFile = name, stickerWidth = sticker.width, stickerHeight = sticker.height))
+        if (capture.stickerFile != name) media.delete(capture.stickerFile)
+    }
+
     suspend fun markPending(id: String) {
         val capture = captureDao.get(id) ?: return
         update(capture.copy(status = RecognitionStatus.PENDING, errorMessage = null))

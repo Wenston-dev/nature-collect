@@ -1,5 +1,8 @@
 package io.github.wgd753.naturecollect.ui.detail
 
+import io.github.wgd753.naturecollect.ui.cutout.CutoutDialog
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -111,6 +114,8 @@ fun CaptureDetailScreen(
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     var showSaveMenu by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
+    var reframePhoto by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     /** Renames, then offers a one-tap undo that puts the old names back. */
     fun renameWithUndo(previous: CaptureEntity, newName: String, action: suspend () -> Unit) {
@@ -189,8 +194,40 @@ fun CaptureDetailScreen(
                     }) {
                         Icon(Icons.Outlined.AutoAwesomeMosaic, contentDescription = tr("贴到画板", "Add to board"), tint = MaterialTheme.colorScheme.primary)
                     }
-                    IconButton(onClick = { confirmDelete = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = tr("删除", "Delete"), tint = MaterialTheme.colorScheme.error)
+                    Box {
+                        IconButton(onClick = { showMore = true }) {
+                            Icon(Icons.Outlined.MoreVert, contentDescription = tr("更多", "More"), tint = MaterialTheme.colorScheme.primary)
+                        }
+                        DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                            DropdownMenuItem(
+                                text = { Text(tr("重新框选", "Re-select subject")) },
+                                leadingIcon = { Icon(Icons.Outlined.Crop, contentDescription = null) },
+                                onClick = {
+                                    showMore = false
+                                    scope.launch {
+                                        reframePhoto = withContext(Dispatchers.IO) {
+                                            BitmapFactory.decodeFile(container.media.file(c.photoFile).path)
+                                        }
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("重新识别", "Identify again")) },
+                                leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
+                                onClick = {
+                                    showMore = false
+                                    scope.launch { container.recognition.retry(c.id) }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    showMore = false
+                                    confirmDelete = true
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -288,6 +325,22 @@ fun CaptureDetailScreen(
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+    reframePhoto?.let { photo ->
+        CutoutDialog(
+            photo = photo,
+            onDismiss = { reframePhoto = null },
+            onDone = { sticker ->
+                reframePhoto = null
+                val id = c?.id ?: return@CutoutDialog
+                scope.launch {
+                    container.captures.replaceSticker(id, sticker)
+                    snackbar.currentSnackbarData?.dismiss()
+                    val result = snackbar.showSnackbar(tr("贴纸已更新", "Sticker updated"), actionLabel = tr("重新识别", "Identify again"))
+                    if (result == SnackbarResult.ActionPerformed) container.recognition.retry(id)
+                }
+            },
+        )
+    }
     }
 
     if (editingName && c != null) {
