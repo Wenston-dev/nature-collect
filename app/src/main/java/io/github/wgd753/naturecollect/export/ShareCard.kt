@@ -48,7 +48,9 @@ object ShareCard {
     /** Renders the card, writes it to the cache and opens the share sheet. */
     suspend fun share(context: Context, media: MediaFiles, capture: CaptureEntity, number: Int?) {
         val uri = withContext(Dispatchers.IO) {
-            val bitmap = render(media, capture, number)
+            val mark = runCatching { android.graphics.BitmapFactory.decodeResource(context.resources, io.github.wgd753.naturecollect.R.drawable.art_logo) }.getOrNull()
+            val bitmap = render(media, capture, number, mark)
+            mark?.recycle()
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
             val file = File(dir, "shiye-${capture.id.take(12)}.png")
@@ -70,7 +72,7 @@ object ShareCard {
         context.startActivity(chooser)
     }
 
-    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?): Bitmap {
+    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?, mark: Bitmap? = null): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(PAPER)
@@ -168,6 +170,13 @@ object ShareCard {
             textAlign = Paint.Align.RIGHT
         }
         canvas.drawText("拾野", WIDTH - MARGIN, HEIGHT - 84f, markPaint)
+        if (mark != null) {
+            val h = 56f
+            val w = h * mark.width / mark.height
+            val right = WIDTH - MARGIN - markPaint.measureText("拾野") - 14f
+            val top = HEIGHT - 84f - h + 10f
+            canvas.drawBitmap(mark, null, android.graphics.RectF(right - w, top, right, top + h), Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        }
         return bitmap
     }
 

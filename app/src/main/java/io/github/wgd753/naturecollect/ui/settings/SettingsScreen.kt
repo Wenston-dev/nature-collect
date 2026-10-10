@@ -1,5 +1,7 @@
 package io.github.wgd753.naturecollect.ui.settings
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -230,6 +232,22 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
             }
 
             Section(tr("关于", "About")) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(io.github.wgd753.naturecollect.R.drawable.art_logo),
+                        contentDescription = null,
+                        modifier = Modifier.size(44.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(tr("拾野", "Shiye"), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "v" + runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 Text(
                     tr(
                         "抠图：MobileSAM（在手机本地运行，不上传照片）\n识别：DeepSeek V4.1 Flash（只上传抠好的贴纸）\n地图：MapLibre + OpenFreeMap（OpenStreetMap 数据）",
