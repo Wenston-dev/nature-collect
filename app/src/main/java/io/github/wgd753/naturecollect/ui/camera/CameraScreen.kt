@@ -9,6 +9,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.ZoomState
+import androidx.lifecycle.Observer
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -33,7 +44,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -88,7 +98,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -100,12 +109,16 @@ import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.StickerImage
-import io.github.wgd753.naturecollect.ui.cutout.SubjectPicker
+import io.github.wgd753.naturecollect.ui.cutout.CutoutEditor
+import io.github.wgd753.naturecollect.ui.cutout.rememberCutoutState
+import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.Paper
 import io.github.wgd753.naturecollect.ui.theme.PaperDeep
+import io.github.wgd753.naturecollect.ui.theme.Night
+import io.github.wgd753.naturecollect.ui.theme.Sun
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -186,6 +199,23 @@ private fun LiveCamera(vm: CameraViewModel) {
     }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val flash = remember { Animatable(0f) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    var minZoom by remember { mutableFloatStateOf(1f) }
+    var maxZoom by remember { mutableFloatStateOf(1f) }
+    var focusPoint by remember { mutableStateOf<Offset?>(null) }
+
+    // Follow the camera's zoom so the 0.6x / 1x / 2x buttons and pinching stay in sync.
+    DisposableEffect(camera) {
+        val zoomState = camera?.cameraInfo?.zoomState
+        val observer = Observer<ZoomState> {
+            zoomRatio = it.zoomRatio
+            minZoom = it.minZoomRatio
+            maxZoom = it.maxZoomRatio
+        }
+        zoomState?.observe(lifecycleOwner, observer)
+        onDispose { zoomState?.removeObserver(observer) }
+    }
 
     if (hasCamera) {
         DisposableEffect(lensFacing) {
@@ -196,7 +226,7 @@ private fun LiveCamera(vm: CameraViewModel) {
                 val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
                 runCatching {
                     provider.unbindAll()
-                    provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+                    camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
                 }
             }, ContextCompat.getMainExecutor(context))
             onDispose {
@@ -208,28 +238,59 @@ private fun LiveCamera(vm: CameraViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .background(Night)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "拍下你遇见的自然",
-            modifier = Modifier.padding(vertical = 8.dp),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Sun))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "对准它，让它待在框中间",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.9f),
+            )
+        }
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(PaperDeep),
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
             if (hasCamera) {
                 AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+                // Pinch to zoom, tap to focus.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(camera) {
+                            detectTransformGestures { _, _, zoom, _ ->
+                                if (zoom != 1f) {
+                                    camera?.cameraControl?.setZoomRatio((zoomRatio * zoom).coerceIn(minZoom, maxZoom))
+                                }
+                            }
+                        }
+                        .pointerInput(camera) {
+                            detectTapGestures { offset ->
+                                val point = previewView.meteringPointFactory.createPoint(offset.x, offset.y)
+                                camera?.cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(point).build())
+                                focusPoint = offset
+                            }
+                        },
+                )
+                focusPoint?.let { FocusRing(it) { focusPoint = null } }
+                ZoomPresets(
+                    current = zoomRatio,
+                    min = minZoom,
+                    max = maxZoom,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+                    onSelect = { camera?.cameraControl?.setZoomRatio(it) },
+                )
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("需要相机权限才能拍照", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("需要相机权限才能拍照", color = Color.White.copy(alpha = 0.7f))
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }) { Text("允许使用相机") }
                 }
@@ -303,10 +364,10 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
                 scaleX = press.value
                 scaleY = press.value
             }
-            .border(4.dp, Card, CircleShape)
-            .padding(6.dp)
+            .border(4.dp, Sun, CircleShape)
+            .padding(7.dp)
             .clip(CircleShape)
-            .background(if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary)
+            .background(if (enabled) Color.White else Color.White.copy(alpha = 0.3f))
             .clickable(enabled = enabled) {
                 scope.launch {
                     press.animateTo(0.86f, tween(70))
@@ -316,7 +377,7 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Outlined.PhotoCamera, contentDescription = "拍照", tint = Color.White)
+        Box(Modifier.size(16.dp).clip(CircleShape).background(Sun))
     }
 }
 
@@ -324,14 +385,14 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
 private fun SideButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Card)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.1f))
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = label, tint = Color.White)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f))
     }
 }
 
@@ -535,33 +596,28 @@ private fun Modifier.pointerInputPeel(
 /** Circle (or tap) the object you want; the highlight shows what will be cut out. */
 @Composable
 private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    val state = rememberCutoutState(
+        stage.image,
+        container.segmenter,
+        SamPrompt.Points(listOf(PromptPoint(stage.image.bitmap.width / 2f, stage.image.bitmap.height / 2f))),
+    )
     Column(
         Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "用手指圈出你想收集的东西",
-            modifier = Modifier.padding(top = 8.dp),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = "圈得松一点没关系；也可以只点一下",
-            modifier = Modifier.padding(bottom = 8.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            SubjectPicker(stage.image.bitmap, stage.overlay, stage.busy, onPrompt = vm::select)
-        }
+        CutoutEditor(state)
         Row(
-            Modifier.padding(top = 16.dp, bottom = 8.dp),
+            Modifier.padding(top = 14.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PillButton("重拍", onClick = vm::reset)
-            PillButton("就它了", primary = true, enabled = !stage.busy, onClick = vm::confirmSelection)
+            PillButton("就它了", primary = true, enabled = state.hasSelection) {
+                scope.launch { state.sticker()?.let(vm::confirmSelection) }
+            }
         }
     }
 }
@@ -658,4 +714,81 @@ private fun FailedMessage(message: String, onRetry: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Button(onClick = onRetry) { Text("再试一次") }
     }
+}
+
+/**
+ * Quick zoom steps. Below 1x CameraX switches to the ultra-wide lens and at
+ * higher ratios to the telephoto, on phones that expose those lenses to apps.
+ */
+@Composable
+private fun ZoomPresets(current: Float, min: Float, max: Float, modifier: Modifier = Modifier, onSelect: (Float) -> Unit) {
+    if (max <= 1.01f && min >= 0.99f) return
+    val presets = buildList {
+        if (min < 0.95f) add(min.coerceAtLeast(0.5f))
+        add(1f)
+        if (max >= 2f) add(2f)
+        if (max >= 5f) add(5f)
+    }
+    val active = presets.minByOrNull { kotlin.math.abs(it - current) }
+    Row(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.35f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        presets.forEach { preset ->
+            val selected = preset == active
+            val size by animateDpAsState(if (selected) 40.dp else 32.dp, label = "zoomChip")
+            val label = if (selected && kotlin.math.abs(current - preset) > 0.05f) {
+                formatZoom(current)
+            } else {
+                formatZoom(preset)
+            }
+            Box(
+                Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(if (selected) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.18f))
+                    .clickable { onSelect(preset) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (selected) Color.Black else Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+    }
+}
+
+private fun formatZoom(ratio: Float): String {
+    val rounded = (ratio * 10).roundToInt() / 10f
+    return if (rounded % 1f == 0f) "${rounded.toInt()}x" else "${rounded}x"
+}
+
+/** A ring that shrinks onto the tapped spot, then fades. */
+@Composable
+private fun FocusRing(at: Offset, onDone: () -> Unit) {
+    val progress = remember(at) { Animatable(0f) }
+    LaunchedEffect(at) {
+        progress.animateTo(1f, tween(650))
+        onDone()
+    }
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val radius = with(density) { (34 - 10 * progress.value).dp.toPx() }
+                drawCircle(
+                    Color.White.copy(alpha = 1f - progress.value * 0.7f),
+                    radius = radius,
+                    center = at,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }),
+                )
+            },
+    )
 }

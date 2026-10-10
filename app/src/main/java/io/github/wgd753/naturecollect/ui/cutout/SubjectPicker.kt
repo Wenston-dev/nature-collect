@@ -18,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,10 +51,16 @@ fun SubjectPicker(
     busy: Boolean,
     onPrompt: (SamPrompt) -> Unit,
     modifier: Modifier = Modifier,
+    erasing: Boolean = false,
+    onErase: (List<PromptPoint>) -> Unit = {},
 ) {
     // Stroke points in view coordinates; kept after lifting so the loop stays visible.
     val stroke = remember(bitmap) { mutableStateListOf<Offset>() }
     val currentOnPrompt by rememberUpdatedState(onPrompt)
+    val currentOnErase by rememberUpdatedState(onErase)
+    val currentErasing by rememberUpdatedState(erasing)
+    // The eraser trail only shows while the finger is down.
+    var erasingNow by remember { mutableStateOf(false) }
     val transition = rememberInfiniteTransition(label = "ants")
     val dashPhase by transition.animateFloat(
         initialValue = 0f,
@@ -68,6 +76,8 @@ fun SubjectPicker(
             .pointerInput(bitmap) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    val eraser = currentErasing
+                    erasingNow = eraser
                     stroke.clear()
                     stroke.add(down.position)
                     var travelled = 0f
@@ -85,7 +95,12 @@ fun SubjectPicker(
                     }
                     val sx = bitmap.width / size.width.toFloat()
                     val sy = bitmap.height / size.height.toFloat()
-                    if (travelled < 24f || stroke.size < 6) {
+                    if (eraser) {
+                        val points = stroke.map { PromptPoint(it.x * sx, it.y * sy, positive = false) }
+                        stroke.clear()
+                        erasingNow = false
+                        currentOnErase(points)
+                    } else if (travelled < 24f || stroke.size < 6) {
                         val p = stroke.first()
                         stroke.clear()
                         currentOnPrompt(SamPrompt.Points(listOf(PromptPoint(p.x * sx, p.y * sy))))
@@ -100,6 +115,12 @@ fun SubjectPicker(
                     val path = Path().apply {
                         moveTo(stroke[0].x, stroke[0].y)
                         for (i in 1 until stroke.size) lineTo(stroke[i].x, stroke[i].y)
+                    }
+                    if (erasingNow) {
+                        // A soft wide trail the size of the eraser brush.
+                        val brush = size.maxDimension * io.github.wgd753.naturecollect.ml.SamSegmenter.ERASER_WIDTH
+                        drawPath(path, Color(0x88FF5A5A), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        return@drawWithContent
                     }
                     val width = 3.dp.toPx()
                     drawPath(path, Color.Black.copy(alpha = 0.35f), style = Stroke(width + 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))

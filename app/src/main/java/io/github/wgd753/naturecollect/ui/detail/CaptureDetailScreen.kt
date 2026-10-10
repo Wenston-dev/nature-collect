@@ -30,6 +30,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import android.graphics.BitmapFactory
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.platform.LocalContext
+import io.github.wgd753.naturecollect.export.Gallery
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
@@ -93,11 +105,39 @@ fun CaptureDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val all by container.captures.observeAll().collectAsState(initial = emptyList())
 
+    val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+    var showSaveMenu by remember { mutableStateOf(false) }
+
+    /** Renames, then offers a one-tap undo that puts the old names back. */
+    fun renameWithUndo(previous: CaptureEntity, newName: String, action: suspend () -> Unit) {
+        scope.launch {
+            action()
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar("已改成「$newName」", actionLabel = "撤回", duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) container.captures.update(previous)
+        }
+    }
+
+    fun saveImage(file: java.io.File, label: String) {
+        scope.launch {
+            val message = runCatching {
+                withContext(Dispatchers.IO) {
+                    val bitmap = BitmapFactory.decodeFile(file.path) ?: error("文件不见了")
+                    Gallery.save(context, bitmap, label, jpeg = file.name.endsWith(".jpg"))
+                }
+            }.fold({ "已保存到$it" }, { "保存失败：${it.message}" })
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(message)
+        }
+    }
+
     val c = capture
     // Every encounter of the same species, newest first, so this page doubles as the species page.
     val siblings = remember(all, c?.nameZh, c?.id) {
         c?.let { current -> all.filter { speciesKey(it) == speciesKey(current) }.sortedByDescending { it.createdAt } }.orEmpty()
     }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(8.dp),
@@ -109,6 +149,27 @@ fun CaptureDetailScreen(
             }
             if (c != null) {
                 Row {
+                    Box {
+                        IconButton(onClick = { showSaveMenu = true }) {
+                            Icon(Icons.Outlined.FileDownload, contentDescription = "保存到相册", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        DropdownMenu(expanded = showSaveMenu, onDismissRequest = { showSaveMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("保存贴纸（透明背景）") },
+                                onClick = {
+                                    showSaveMenu = false
+                                    saveImage(container.media.file(c.stickerFile), "${c.displayName}-贴纸")
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("保存原图") },
+                                onClick = {
+                                    showSaveMenu = false
+                                    saveImage(container.media.file(c.photoFile), "${c.displayName}-原图")
+                                },
+                            )
+                        }
+                    }
                     IconButton(onClick = {
                         scope.launch {
                             container.boards.ensureDefaultBoard()
@@ -191,7 +252,7 @@ fun CaptureDetailScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     alternatives.forEach { name ->
                         FilterPill(name, selected = false) {
-                            scope.launch {
+                            renameWithUndo(c, name) {
                                 container.captures.rename(c.id, name, Category.fromKey(c.category), nameSci = null)
                                 container.recognition.fillDetails(c.id)
                             }
@@ -216,11 +277,13 @@ fun CaptureDetailScreen(
             Spacer(Modifier.height(32.dp))
         }
     }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+    }
 
     if (editingName && c != null) {
         RenameDialog(c, onDismiss = { editingName = false }) { name, sci, category, description ->
             editingName = false
-            scope.launch { container.captures.rename(c.id, name, category, sci, description) }
+            renameWithUndo(c, name) { container.captures.rename(c.id, name, category, sci, description) }
         }
     }
     if (editingNotes && c != null) {

@@ -7,8 +7,6 @@ import io.github.wgd753.naturecollect.AppContainer
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ml.SamImage
-import io.github.wgd753.naturecollect.ml.SamPrompt
-import io.github.wgd753.naturecollect.ui.cutout.maskOverlay
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -28,8 +26,8 @@ sealed interface CameraStage {
     /** A sticker is ready to be peeled off. */
     data class Sticker(val image: SamImage, val sticker: Bitmap) : CameraStage
 
-    /** The user is tapping to choose a different subject. */
-    data class Selecting(val image: SamImage, val overlay: Bitmap?, val busy: Boolean) : CameraStage
+    /** The user is circling, tapping or erasing to choose a different subject. */
+    data class Selecting(val image: SamImage) : CameraStage
 
     data class Saved(val captureId: String) : CameraStage
 
@@ -43,7 +41,6 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
     private var photo: Bitmap? = null
     private var takenAt: Long = 0
     private var latLng: DoubleArray? = null
-    private var pendingSticker: Bitmap? = null
     private var job: Job? = null
 
     /** Starts the pipeline for a new photo. [exifLatLng] comes from imported photos. */
@@ -64,7 +61,7 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
                 _stage.value = if (sticker != null) {
                     CameraStage.Sticker(image, sticker)
                 } else {
-                    CameraStage.Selecting(image, overlay = null, busy = false)
+                    CameraStage.Selecting(image)
                 }
             } catch (e: Exception) {
                 _stage.value = CameraStage.Failed("抠图失败：${describe(e)}")
@@ -74,26 +71,12 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
 
     fun startSelecting() {
         val stage = _stage.value as? CameraStage.Sticker ?: return
-        pendingSticker = stage.sticker
-        _stage.value = CameraStage.Selecting(stage.image, overlay = null, busy = false)
+        _stage.value = CameraStage.Selecting(stage.image)
     }
 
-    /** Re-runs only the fast decoder for a new tap or loop. */
-    fun select(prompt: SamPrompt) {
+    /** Uses the sticker made in the selection editor. */
+    fun confirmSelection(sticker: Bitmap) {
         val stage = _stage.value as? CameraStage.Selecting ?: return
-        job?.cancel()
-        _stage.value = stage.copy(busy = true)
-        job = viewModelScope.launch {
-            val alpha = container.segmenter.segment(stage.image, prompt)
-            pendingSticker = StickerMaker.make(stage.image.bitmap, alpha)
-            val overlay = maskOverlay(alpha, stage.image.bitmap.width, stage.image.bitmap.height)
-            _stage.value = CameraStage.Selecting(stage.image, overlay = overlay, busy = false)
-        }
-    }
-
-    fun confirmSelection() {
-        val stage = _stage.value as? CameraStage.Selecting ?: return
-        val sticker = pendingSticker ?: return
         _stage.value = CameraStage.Sticker(stage.image, sticker)
     }
 
@@ -119,7 +102,6 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
     fun reset() {
         job?.cancel()
         photo = null
-        pendingSticker = null
         _stage.value = CameraStage.Live
     }
 

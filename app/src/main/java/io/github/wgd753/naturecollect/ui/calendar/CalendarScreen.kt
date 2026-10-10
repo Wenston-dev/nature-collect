@@ -84,7 +84,7 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
     val zone = ZoneId.systemDefault()
     val byDay = remember(captures, filter) {
         captures
-            .filter { filter == null || Category.fromKey(it.category) == filter }
+            .filter { filter == null || Category.fromKey(it.category).key == filter?.key }
             .groupBy { Instant.ofEpochMilli(it.createdAt).atZone(zone).toLocalDate() }
     }
 

@@ -72,7 +72,7 @@ class PosterRenderer(private val media: MediaFiles) {
         var x = margin
         var y = 270f
         Category.entries.forEach { category ->
-            val count = groups.count { it.category == category }
+            val count = groups.count { it.category.key == category.key }
             if (count == 0) return@forEach
             val text = "${category.emoji} ${category.label} $count"
             val w = chipPaint.measureText(text) + 48f
@@ -170,14 +170,7 @@ class PosterRenderer(private val media: MediaFiles) {
 
     private fun day(millis: Long) = SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(Date(millis))
 
-    private fun tint(category: Category): Int = when (category) {
-        Category.BIRD -> 0xFF3B82C4.toInt()
-        Category.FLOWER -> 0xFFE0619A.toInt()
-        Category.PLANT -> 0xFF3F9B5A.toInt()
-        Category.INSECT -> 0xFFE08A2E.toInt()
-        Category.ANIMAL -> 0xFF9A6A3F.toInt()
-        Category.OTHER -> 0xFF7C6FD6.toInt()
-    }
+    private fun tint(category: Category): Int = category.color.toInt()
 
     private companion object {
         val PAPER = 0xFFEFEBE3.toInt()

@@ -50,7 +50,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -130,6 +130,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     }) { Text("重试失败的识别") }
                 }
+            }
+
+            Section("图鉴分类") {
+                Text(
+                    "添加或修改分类（emoji + 名字），拍照识别时 AI 会从这些分类里挑。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = onOpenCategories) { Text("管理分类") }
             }
 
             Section("备份") {

@@ -74,7 +74,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     val captures by container.captures.observeAll().collectAsState(initial = emptyList())
     var filter by rememberSaveable { mutableStateOf<Category?>(null) }
     val located = captures.filter { it.latitude != null && it.longitude != null }
-    val shown = located.filter { filter == null || Category.fromKey(it.category) == filter }
+    val shown = located.filter { filter == null || Category.fromKey(it.category).key == filter?.key }
 
     val mapView = remember { MapView(context).apply { onCreate(null) } }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }

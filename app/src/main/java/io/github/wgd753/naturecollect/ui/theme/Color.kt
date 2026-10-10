@@ -2,13 +2,30 @@ package io.github.wgd753.naturecollect.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/** Warm paper background, like a field notebook. */
-val Paper = Color(0xFFEFEBE3)
-val PaperDeep = Color(0xFFE4DFD4)
-val Card = Color(0xFFF8F6F1)
+// "森野" palette: deep forest green with sunflower and coral accents on a pale sage ground.
 
-/** Deep ink blue used for titles, selected tabs and the shutter button. */
-val Ink = Color(0xFF1F2FC8)
-val InkSoft = Color(0xFF9EA6E3)
+/** Deep forest green: titles, the nav capsule, primary buttons. */
+val Forest = Color(0xFF1F5B45)
+val ForestDeep = Color(0xFF143D2E)
 
-val TextMuted = Color(0xFF8A877F)
+/** Sunflower yellow: the shutter, highlights, the active tab dot. */
+val Sun = Color(0xFFF5B83D)
+
+/** Coral: secondary highlights and badges. */
+val Coral = Color(0xFFF0775A)
+
+/** Pale sage page background. */
+val Paper = Color(0xFFEEF3EC)
+val PaperDeep = Color(0xFFDCE6D9)
+
+/** Cards sit on the sage ground in plain white. */
+val Card = Color(0xFFFFFFFF)
+
+/** Near-black green for camera screens. */
+val Night = Color(0xFF101C16)
+
+// Older names, kept so every screen picks up the new palette.
+val Ink = Forest
+val InkSoft = Color(0xFF8FB0A0)
+
+val TextMuted = Color(0xFF6B7A71)

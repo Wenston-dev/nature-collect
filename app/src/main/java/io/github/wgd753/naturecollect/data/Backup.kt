@@ -25,6 +25,7 @@ class Backup(
     private val context: Context,
     private val db: AppDatabase,
     private val media: MediaFiles,
+    private val categories: CategoryStore,
 ) {
     suspend fun export(target: Uri): Int = withContext(Dispatchers.IO) {
         val captures = db.captureDao().getAll()
@@ -35,6 +36,7 @@ class Backup(
             .put("captures", JSONArray(captures.map { it.toJson() }))
             .put("boards", JSONArray(boards.map { it.toJson() }))
             .put("boardItems", JSONArray(items.map { it.toJson() }))
+            .put("categories", CategoryStore.encode(Category.entries))
         val out = context.contentResolver.openOutputStream(target) ?: error("无法写入备份文件")
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(DATA_ENTRY))
@@ -71,6 +73,12 @@ class Backup(
         val data = json ?: error("这不是自然收集的备份文件")
         val captures = data.getJSONArray("captures").objects().map { it.toCapture() }
         captures.forEach { db.captureDao().upsert(it) }
+        data.optJSONArray("categories")?.let { array ->
+            // Keep categories added on this phone; the backup's versions win for shared keys.
+            val incoming = CategoryStore.decode(array)
+            val merged = Category.entries.filter { local -> incoming.none { it.key == local.key } }
+            categories.save(incoming + merged)
+        }
         data.optJSONArray("boards")?.objects()?.forEach { db.boardDao().upsertBoard(it.toBoard()) }
         data.optJSONArray("boardItems")?.objects()?.forEach { db.boardDao().upsertItem(it.toBoardItem()) }
         captures.size

@@ -64,7 +64,7 @@ class DeepSeekRecognizer(
             .put(
                 "messages",
                 JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                    .put(JSONObject().put("role", "system").put("content", systemPrompt(Category.entries)))
                     .put(
                         JSONObject().put("role", "user").put(
                             "content",
@@ -90,7 +90,7 @@ class DeepSeekRecognizer(
             .put(
                 "messages",
                 JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", LOOKUP_PROMPT))
+                    .put(JSONObject().put("role", "system").put("content", lookupPrompt(Category.entries)))
                     .put(JSONObject().put("role", "user").put("content", query.trim())),
             )
         parse(chat(apiKey, body))
@@ -124,20 +124,29 @@ class DeepSeekRecognizer(
         private const val ENDPOINT = "https://api.deepseek.com/chat/completions"
         private const val MODEL = "deepseek-flash"
 
-        private val SYSTEM_PROMPT = """
-            你是一位熟悉中国动植物的博物学家。用户会发来一张抠好的照片贴纸，请识别其中的主体。
-            只输出一个 JSON 对象，不要输出其他文字，格式如下：
-            {"name_zh":"中文常用名","name_sci":"学名（拉丁文，不确定就填 null）","category":"BIRD|FLOWER|PLANT|INSECT|ANIMAL|OTHER 之一","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":["其他可能的中文名，最多3个"]}
-            分类规则：鸟类用 BIRD；以花为主体的用 FLOWER；树木、草、叶子、蘑菇等用 PLANT；昆虫、蜘蛛等用 INSECT；其他动物（含猫狗）用 ANIMAL；不是生物用 OTHER。
-            尽量具体到种；只能确定到属或科时，name_zh 写到能确定的那一级，并降低 confidence。
-        """.trimIndent()
+        /** The user's categories, one per line, for the model to choose from. */
+        private fun categoryList(categories: List<Category>): String =
+            categories.joinToString("\n") { c ->
+                "- ${c.key}：${c.emoji}${c.label}" + (c.hint?.let { "（$it）" } ?: "")
+            }
 
-        private val LOOKUP_PROMPT = """
+        private fun systemPrompt(categories: List<Category>) = """
+            你是一位熟悉中国动植物的博物学家。用户会发来一张抠好的照片贴纸，请识别其中最主要、最完整的那个主体。
+            只输出一个 JSON 对象，不要输出其他文字，格式如下：
+            {"name_zh":"中文常用名","name_sci":"学名（拉丁文；不是生物就填英文名；不确定就填 null）","category":"下面分类里的一个代号","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":["其他可能的中文名，最多3个"]}
+            可选分类（category 填冒号前的代号，选最贴切的一个；都不合适就填 ${Category.OTHER_KEY}）：
+            {CATEGORIES}
+            尽量具体到种；只能确定到属或科时，name_zh 写到能确定的那一级，并降低 confidence。
+        """.trimIndent().replace("{CATEGORIES}", categoryList(categories))
+
+        private fun lookupPrompt(categories: List<Category>) = """
             你是一位熟悉中国动植物的博物学家。用户会给出一个物种或物体的名字，可能是中文名、英文名或拉丁学名。
             请把它对应到同一个物种，只输出一个 JSON 对象，不要输出其他文字：
-            {"name_zh":"中文常用名","name_sci":"拉丁学名；不是生物或没有学名时填英文名","category":"BIRD|FLOWER|PLANT|INSECT|ANIMAL|OTHER 之一","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":[]}
+            {"name_zh":"中文常用名","name_sci":"拉丁学名；不是生物或没有学名时填英文名","category":"下面分类里的一个代号","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":[]}
+            可选分类（填冒号前的代号；都不合适就填 ${Category.OTHER_KEY}）：
+            {CATEGORIES}
             用户给的是中文名时，name_zh 原样保留；给的是英文或学名时，翻译成最常用的中文名。
-        """.trimIndent()
+        """.trimIndent().replace("{CATEGORIES}", categoryList(categories))
 
         /** Pulls the JSON object out of the reply, tolerating code fences or stray text. */
         fun parse(text: String): RecognitionResult {

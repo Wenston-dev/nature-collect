@@ -31,7 +31,6 @@ import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.theme.Paper
 import kotlinx.coroutines.launch
 
 /**
@@ -44,29 +43,13 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
     var image by remember { mutableStateOf<SamImage?>(null) }
-    var overlay by remember { mutableStateOf<Bitmap?>(null) }
-    var sticker by remember { mutableStateOf<Bitmap?>(null) }
-    var busy by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-
-    fun run(prompt: (SamImage) -> SamPrompt) {
-        val img = image ?: return
-        busy = true
-        scope.launch {
-            val alpha = container.segmenter.segment(img, prompt(img))
-            overlay = maskOverlay(alpha, img.bitmap.width, img.bitmap.height)
-            sticker = StickerMaker.make(img.bitmap, alpha)
-            busy = false
-        }
-    }
 
     LaunchedEffect(photo) {
         try {
             image = container.segmenter.encode(photo)
-            run { SamPrompt.Points(listOf(PromptPoint(it.bitmap.width / 2f, it.bitmap.height / 2f))) }
         } catch (e: Exception) {
             error = e.message ?: e.javaClass.simpleName
-            busy = false
         }
     }
 
@@ -74,24 +57,21 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
         Column(
             Modifier
                 .fillMaxSize()
-                .background(Paper)
+                .background(MaterialTheme.colorScheme.background)
                 .systemBarsPadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                "圈出想要的部分，或点一下",
-                modifier = Modifier.padding(vertical = 8.dp),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val img = image
-                when {
-                    error != null -> Text("抠图失败：$error", color = MaterialTheme.colorScheme.error)
-                    img == null -> CircularProgressIndicator()
-                    else -> SubjectPicker(img.bitmap, overlay, busy, onPrompt = { prompt -> run { prompt } })
+            val img = image
+            val state = img?.let {
+                rememberCutoutState(it, container.segmenter, SamPrompt.Points(listOf(PromptPoint(it.bitmap.width / 2f, it.bitmap.height / 2f))))
+            }
+            if (state == null) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (error != null) Text("抠图失败：$error", color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
                 }
+            } else {
+                CutoutEditor(state)
             }
             Row(
                 Modifier.padding(top = 16.dp),
@@ -99,7 +79,9 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
             ) {
                 PillButton("取消", onClick = onDismiss)
                 PillButton("整张贴上") { onDone(StickerMaker.framed(photo)) }
-                PillButton("用抠出的", primary = true, enabled = sticker != null && !busy) { sticker?.let(onDone) }
+                PillButton("用抠出的", primary = true, enabled = state?.hasSelection == true) {
+                    scope.launch { state?.sticker()?.let(onDone) }
+                }
             }
         }
     }

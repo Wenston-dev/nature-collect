@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +54,7 @@ import java.io.File
 @Composable
 fun rememberContainer(): AppContainer = (LocalContext.current.applicationContext as NatureApp).container
 
-/** Big italic page title with optional actions on the right. */
+/** Page title with a small coloured overline, and optional actions on the right. */
 @Composable
 fun PageHeader(
     title: String,
@@ -62,16 +64,51 @@ fun PageHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 24.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+            .padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.displaySmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        Column {
+            Text(
+                text = OVERLINES[title] ?: "NATURE",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
+}
+
+private val OVERLINES = mapOf(
+    "图鉴" to "FIELD GUIDE",
+    "贴纸板" to "STICKER BOARD",
+    "日历" to "NATURE JOURNAL",
+    "地图" to "WHERE I MET THEM",
+)
+
+/** Round icon button on a soft tinted disc, used in page headers. */
+@Composable
+fun HeaderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .padding(start = 8.dp)
+            .size(42.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(icon, contentDescription = description, tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -119,7 +156,8 @@ fun CategoryFilterRow(
     selected: Category?,
     onSelect: (Category?) -> Unit,
     modifier: Modifier = Modifier,
-    available: Set<Category> = Category.entries.toSet(),
+    available: Set<String>? = null,
+    onManage: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -129,11 +167,13 @@ fun CategoryFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterPill(text = "全部", selected = selected == null) { onSelect(null) }
-        Category.entries.filter { it in available }.forEach { category ->
-            FilterPill(text = "${category.emoji} ${category.label}", selected = selected == category, tint = category.tint) {
-                onSelect(if (selected == category) null else category)
+        Category.entries.filter { available == null || it.key in available }.forEach { category ->
+            val isSelected = selected?.key == category.key
+            FilterPill(text = "${category.emoji} ${category.label}", selected = isSelected, tint = category.tint) {
+                onSelect(if (isSelected) null else category)
             }
         }
+        if (onManage != null) FilterPill(text = "＋ 分类", selected = false, onClick = onManage)
     }
 }
 
@@ -145,10 +185,11 @@ fun FilterPill(text: String, selected: Boolean, tint: Color? = null, onClick: ()
     Text(
         text = text,
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(14.dp))
             .background(bg)
+            .border(1.dp, if (selected) Color.Transparent else accent.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(PaddingValues(horizontal = 16.dp, vertical = 9.dp)),
+            .padding(PaddingValues(horizontal = 14.dp, vertical = 8.dp)),
         style = MaterialTheme.typography.titleMedium,
         color = fg,
     )
@@ -160,10 +201,10 @@ fun PillButton(text: String, primary: Boolean = false, enabled: Boolean = true, 
     Text(
         text = text,
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(16.dp))
             .background(if (primary) MaterialTheme.colorScheme.primary else Card)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 11.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f },
         color = if (primary) Color.White else MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleMedium,
@@ -231,15 +272,7 @@ fun Modifier.holographic(
 }
 
 /** Accent colour for a category, used for chips, badges and poster labels. */
-val Category.tint: Color
-    get() = when (this) {
-        Category.BIRD -> Color(0xFF3B82C4)
-        Category.FLOWER -> Color(0xFFE0619A)
-        Category.PLANT -> Color(0xFF3F9B5A)
-        Category.INSECT -> Color(0xFFE08A2E)
-        Category.ANIMAL -> Color(0xFF9A6A3F)
-        Category.OTHER -> Color(0xFF7C6FD6)
-    }
+val Category.tint: Color get() = Color(color)
 
 fun formatDate(millis: Long): String =
     java.text.SimpleDateFormat("yyyy年M月d日 HH:mm", java.util.Locale.CHINA).format(java.util.Date(millis))

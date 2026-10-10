@@ -17,6 +17,20 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import io.github.wgd753.naturecollect.ui.HeaderIconButton
+import io.github.wgd753.naturecollect.ui.theme.Coral
+import io.github.wgd753.naturecollect.ui.theme.Forest
+import io.github.wgd753.naturecollect.ui.theme.ForestDeep
+import io.github.wgd753.naturecollect.ui.theme.Sun
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -89,7 +103,7 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Composable
-fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit) {
+fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit, onOpenCategories: () -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -100,8 +114,9 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
     var exporting by remember { mutableStateOf(false) }
 
     val all = captures.orEmpty()
-    val groups = remember(all) { all.groupBySpecies() }
-    val shown = groups.filter { filter == null || it.category == filter }
+    val categories = Category.entries
+    val groups = remember(all, categories) { all.groupBySpecies() }
+    val shown = groups.filter { filter == null || it.category.key == filter?.key }
     val speciesCount = groups.count { it.cover.nameZh != null }
     val selecting = selected.isNotEmpty()
     val monthStart = remember {
@@ -155,16 +170,14 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
                 )
             } else {
                 PageHeader("图鉴") {
-                    IconButton(onClick = { export() }, enabled = !exporting && shown.isNotEmpty()) {
-                        if (exporting) {
+                    if (exporting) {
+                        Box(Modifier.padding(start = 8.dp).size(42.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Outlined.FileDownload, contentDescription = "导出图鉴长图", tint = MaterialTheme.colorScheme.primary)
                         }
+                    } else {
+                        HeaderIconButton(Icons.Outlined.FileDownload, "导出图鉴长图", enabled = shown.isNotEmpty()) { export() }
                     }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = MaterialTheme.colorScheme.primary)
-                    }
+                    HeaderIconButton(Icons.Outlined.Settings, "设置", onClick = onOpenSettings)
                 }
             }
         }
@@ -172,25 +185,35 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
             EmptyState("🌿", "还没有收集到任何东西\n去「拍照」拍下第一只小鸟或一朵花吧")
             return@Column
         }
-        StatsRow(speciesCount = speciesCount, total = all.size, newThisMonth = newThisMonth)
-        CategoryFilterRow(
-            selected = filter,
-            onSelect = { filter = it },
-            available = groups.map { it.category }.toSet(),
-        )
-        if (!selecting && groups.isNotEmpty()) {
-            Text(
-                "长按可以多选删除",
-                modifier = Modifier.padding(start = 24.dp, top = 2.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(12.dp),
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
+            item(key = "hero", span = { GridItemSpan(maxLineSpan) }) {
+                HeroCard(groups = groups, speciesCount = speciesCount, total = all.size, newThisMonth = newThisMonth)
+            }
+            item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    CategoryFilterRow(
+                        selected = filter,
+                        onSelect = { filter = it },
+                        available = groups.map { it.category.key }.toSet(),
+                        onManage = onOpenCategories,
+                        modifier = Modifier.padding(horizontal = 0.dp),
+                    )
+                    if (!selecting && groups.isNotEmpty()) {
+                        Text(
+                            "长按卡片可以多选删除",
+                            modifier = Modifier.padding(start = 6.dp, top = 2.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             items(shown, key = { it.key }) { group ->
                 val isSelected = group.key in selected
                 SpeciesCell(
@@ -260,37 +283,66 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
     }
 }
 
+/** Green summary card: species count, encounters, and a bar of how the collection splits by category. */
 @Composable
-private fun StatsRow(speciesCount: Int, total: Int, newThisMonth: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        StatCard("$speciesCount", "已收集物种", Modifier.weight(1f))
-        StatCard("$total", "遇见次数", Modifier.weight(1f))
-        StatCard("+$newThisMonth", "本月新物种", Modifier.weight(1f))
+private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, newThisMonth: Int) {
+    val counts = remember(groups) {
+        groups.groupingBy { it.category.key }.eachCount()
     }
-}
-
-@Composable
-private fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
+    val categories = Category.entries.filter { (counts[it.key] ?: 0) > 0 }
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Card)
-            .padding(vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(Brush.linearGradient(listOf(Forest, ForestDeep)))
+            .padding(20.dp),
     ) {
-        AnimatedContent(
-            targetState = value,
-            transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
-            label = "stat",
-        ) { v ->
-            Text(v, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Row(verticalAlignment = Alignment.Bottom) {
+            AnimatedContent(
+                targetState = speciesCount,
+                transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
+                label = "speciesCount",
+            ) { n ->
+                Text("$n", color = Sun, fontSize = 52.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.padding(bottom = 8.dp)) {
+                Text("种已收集", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "遇见 $total 次 · 本月新增 $newThisMonth 种",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (categories.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            // Proportional bar, one segment per category.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp)),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                categories.forEach { c ->
+                    Box(Modifier.weight((counts[c.key] ?: 0).toFloat()).fillMaxSize().background(c.tint))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                categories.forEach { c ->
+                    Text(
+                        "${c.emoji} ${c.label} ${counts[c.key] ?: 0}",
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -310,7 +362,7 @@ private fun SpeciesCell(
     val appear = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)) }
     val press by animateFloatAsState(
-        targetValue = if (selected) 0.86f else 1f,
+        targetValue = if (selected) 0.94f else 1f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
         label = "selectScale",
     )
@@ -320,78 +372,99 @@ private fun SpeciesCell(
 
     Column(
         modifier = modifier
-            .padding(6.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (selected) accent.copy(alpha = 0.14f) else Color.Transparent)
-            .border(if (selected) 2.dp else 0.dp, if (selected) accent else Color.Transparent, RoundedCornerShape(20.dp))
+            .graphicsLayer {
+                scaleX = press
+                scaleY = press
+            }
+            .shadow(if (selected) 0.dp else 3.dp, RoundedCornerShape(24.dp), spotColor = accent.copy(alpha = 0.4f))
+            .clip(RoundedCornerShape(24.dp))
+            .background(Card)
+            .border(if (selected) 2.5.dp else 0.dp, if (selected) accent else Color.Transparent, RoundedCornerShape(24.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLongClick()
                 },
-            )
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            ),
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(8.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    Brush.radialGradient(listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.06f))),
+                ),
+        ) {
             StickerImage(
                 cover,
                 Modifier
                     .fillMaxSize()
+                    .padding(10.dp)
                     .graphicsLayer {
-                        rotationZ = if (selecting) tilt * 0.4f else tilt
-                        scaleX = appear.value * press
-                        scaleY = appear.value * press
+                        rotationZ = if (selecting) 0f else tilt
+                        scaleX = appear.value
+                        scaleY = appear.value
                     },
+            )
+            Text(
+                group.category.emoji,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(CircleShape)
+                    .background(Card.copy(alpha = 0.9f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 14.sp,
             )
             if (group.captures.size > 1) {
                 Text(
-                    text = group.captures.size.toString(),
+                    text = "×${group.captures.size}",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .clip(CircleShape)
-                        .background(accent)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Coral)
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
                     color = Color.White,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
             androidx.compose.animation.AnimatedVisibility(
                 visible = selecting,
-                modifier = Modifier.align(Alignment.TopStart),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
                 enter = scaleIn() + fadeIn(),
                 exit = scaleOut() + fadeOut(),
             ) {
                 Box(
                     Modifier
-                        .size(24.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
-                        .background(if (selected) Color.White else Color.White.copy(alpha = 0.8f))
+                        .background(Color.White)
                         .border(2.dp, if (selected) accent else Color.LightGray, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "已选", tint = accent, modifier = Modifier.size(24.dp))
+                    if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "已选", tint = accent, modifier = Modifier.size(26.dp))
                 }
             }
         }
-        Row(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Card)
-                .padding(horizontal = 10.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
-            Spacer(Modifier.width(5.dp))
+        Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
             Text(
                 text = if (recognizing && cover.nameZh == null) "识别中…" else group.name,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = group.nameSci ?: group.category.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontStyle = if (group.nameSci != null) FontStyle.Italic else FontStyle.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -11,8 +11,8 @@ Encoder: input "image" [1, 3, 1024, 1024], already normalised with SAM's
 pixel mean/std and zero-padded on the right/bottom; output
 "image_embeddings" [1, 256, 64, 64].
 
-Decoder: SAM's standard ONNX prompt decoder returning the single best mask
-at "orig_im_size" resolution.
+Decoder: SAM's standard ONNX prompt decoder returning all four candidate masks
+and their scores at "orig_im_size" resolution, so the app can offer sizes.
 """
 
 import argparse
@@ -57,7 +57,7 @@ def main():
         dynamo=False,
     )
 
-    decoder = SamOnnxModel(sam, return_single_mask=True)
+    decoder = SamOnnxModel(sam, return_single_mask=False)
     embed_dim = sam.prompt_encoder.embed_dim
     embed_size = sam.prompt_encoder.image_embedding_size
     mask_input_size = [4 * x for x in embed_size]

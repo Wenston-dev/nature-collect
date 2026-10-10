@@ -4,6 +4,7 @@ import android.app.Application
 import io.github.wgd753.naturecollect.data.Backup
 import io.github.wgd753.naturecollect.data.BoardRepository
 import io.github.wgd753.naturecollect.data.CaptureRepository
+import io.github.wgd753.naturecollect.data.CategoryStore
 import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.data.db.AppDatabase
@@ -24,12 +25,13 @@ class AppContainer(app: Application) {
     val db = AppDatabase.create(app)
     val media = MediaFiles(app)
     val settings = Settings(app)
+    val categories = CategoryStore(app)
     val captures = CaptureRepository(db.captureDao(), db.boardDao(), media)
     val boards = BoardRepository(db.boardDao())
     val segmenter = SamSegmenter(app)
     val location = LocationHelper(app)
     val recognition = RecognitionService(app, appScope, captures, media, settings, DeepSeekRecognizer(), PlaceResolver(app))
-    val backup = Backup(app, db, media)
+    val backup = Backup(app, db, media, categories)
 }
 
 class NatureApp : Application() {
