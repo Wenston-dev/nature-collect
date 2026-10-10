@@ -68,7 +68,7 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
                     CameraStage.Selecting(image, overlay = null, busy = false)
                 }
             } catch (e: Exception) {
-                _stage.value = CameraStage.Failed("抠图失败：${e.message ?: e.javaClass.simpleName}")
+                _stage.value = CameraStage.Failed("抠图失败：${describe(e)}")
             }
         }
     }
@@ -126,6 +126,13 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
 
     fun fail(message: String) {
         _stage.value = CameraStage.Failed(message)
+    }
+
+    /** Exception name plus where in our code it happened, so a screenshot is enough to debug. */
+    private fun describe(e: Throwable): String {
+        val frame = e.stackTrace.firstOrNull { it.className.startsWith("io.github.wgd753") }
+        val where = frame?.let { "\n${it.fileName}:${it.lineNumber}" }.orEmpty()
+        return (e.message ?: e.javaClass.simpleName) + where
     }
 
     /** Ink-blue translucent highlight over the selected object. */

@@ -29,7 +29,7 @@ object StickerMaker {
 
         // Cut the object out of the photo.
         val pixels = IntArray(boxW * boxH)
-        image.getPixels(pixels, 0, w, box[0], box[1], boxW, boxH)
+        image.getPixels(pixels, 0, boxW, box[0], box[1], boxW, boxH)
         for (y in 0 until boxH) {
             for (x in 0 until boxW) {
                 val i = y * boxW + x
