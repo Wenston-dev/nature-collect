@@ -15,6 +15,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+
+        ndk {
+            // Phones from the last several years are all 64-bit ARM; dropping the
+            // other ABIs roughly halves the APK (ONNX Runtime and MapLibre are native).
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
