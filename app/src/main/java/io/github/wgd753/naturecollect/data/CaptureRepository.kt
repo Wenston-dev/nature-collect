@@ -53,6 +53,8 @@ class CaptureRepository(
 
     suspend fun unrecognized(): List<CaptureEntity> = captureDao.getUnrecognized()
 
+    suspend fun missingPlaces(): List<CaptureEntity> = captureDao.getMissingPlaces()
+
     /** Saves the photo and sticker files and records a new capture awaiting recognition. */
     suspend fun create(
         photo: Bitmap,

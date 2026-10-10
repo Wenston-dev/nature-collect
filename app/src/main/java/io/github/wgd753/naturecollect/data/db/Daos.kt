@@ -25,6 +25,9 @@ interface CaptureDao {
     @Query("SELECT * FROM captures WHERE status IN ('PENDING', 'FAILED', 'RUNNING') ORDER BY createdAt")
     suspend fun getUnrecognized(): List<CaptureEntity>
 
+    @Query("SELECT * FROM captures WHERE placeName IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY createdAt DESC LIMIT 30")
+    suspend fun getMissingPlaces(): List<CaptureEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(capture: CaptureEntity)
 

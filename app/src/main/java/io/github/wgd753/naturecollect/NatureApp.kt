@@ -8,6 +8,7 @@ import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.data.db.AppDatabase
 import io.github.wgd753.naturecollect.location.LocationHelper
+import io.github.wgd753.naturecollect.location.PlaceResolver
 import io.github.wgd753.naturecollect.ml.SamSegmenter
 import io.github.wgd753.naturecollect.recognition.DeepSeekRecognizer
 import io.github.wgd753.naturecollect.recognition.RecognitionService
@@ -27,7 +28,7 @@ class AppContainer(app: Application) {
     val boards = BoardRepository(db.boardDao())
     val segmenter = SamSegmenter(app)
     val location = LocationHelper(app)
-    val recognition = RecognitionService(app, captures, media, settings, DeepSeekRecognizer())
+    val recognition = RecognitionService(app, appScope, captures, media, settings, DeepSeekRecognizer(), PlaceResolver(app))
     val backup = Backup(app, db, media)
 }
 
@@ -41,9 +42,9 @@ class NatureApp : Application() {
         MapLibre.getInstance(this)
         container.appScope.launch {
             container.boards.ensureDefaultBoard()
-            container.segmenter.warmUp()
+            // Pick up anything that was waiting for a network when the app last closed.
+            container.recognition.recoverInterrupted()
+            container.recognition.schedule()
         }
-        // Pick up anything that was waiting for a network when the app last closed.
-        container.recognition.schedule()
     }
 }

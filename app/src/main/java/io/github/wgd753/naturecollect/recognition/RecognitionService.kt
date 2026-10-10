@@ -12,18 +12,65 @@ import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ml.StickerMaker
+import io.github.wgd753.naturecollect.location.PlaceResolver
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 
 /** Runs recognition for captures and schedules retries when offline. */
 class RecognitionService(
     private val context: Context,
+    private val scope: CoroutineScope,
     private val repository: CaptureRepository,
     private val media: MediaFiles,
     private val settings: Settings,
     private val recognizer: DeepSeekRecognizer,
+    private val places: PlaceResolver,
 ) {
-    /** Queues recognition of everything pending; runs as soon as there is a network. */
+    private val mutex = Mutex()
+
+    /**
+     * Recognises everything pending right away, in the app's own scope so it
+     * keeps going when the user leaves the screen. Anything that fails for a
+     * temporary reason is handed to WorkManager to retry once there's a network.
+     */
     fun schedule() {
+        scope.launch {
+            val retry = runPending()
+            if (retry) scheduleRetry()
+        }
+    }
+
+    /** Serialised so the in-app run and a WorkManager run never work on the same capture. */
+    suspend fun runPending(): Boolean = mutex.withLock {
+        resolvePlaces()
+        processPending()
+    }
+
+    /** Captures left "running" by a killed process go back in the queue. */
+    suspend fun recoverInterrupted() {
+        repository.unrecognized().filter { it.status == RecognitionStatus.RUNNING }.forEach {
+            repository.update(it.copy(status = RecognitionStatus.PENDING))
+        }
+    }
+
+    private suspend fun resolvePlaces() {
+        val todo = repository.missingPlaces()
+        for ((index, capture) in todo.withIndex()) {
+            val lat = capture.latitude ?: continue
+            val lon = capture.longitude ?: continue
+            val name = places.resolve(lat, lon) ?: continue
+            val latest = repository.get(capture.id) ?: continue
+            if (latest.placeName == null) repository.update(latest.copy(placeName = name))
+            // Nominatim allows one request a second.
+            if (index < todo.lastIndex) delay(1100)
+        }
+    }
+
+    private fun scheduleRetry() {
         val request = OneTimeWorkRequestBuilder<RecognitionWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -35,7 +82,7 @@ class RecognitionService(
      * Recognises every capture still waiting. Returns true if some failed in a
      * way worth retrying later (e.g. the network dropped).
      */
-    suspend fun processPending(): Boolean {
+    private suspend fun processPending(): Boolean {
         val apiKey = settings.apiKey.value
         var retry = false
         for (capture in repository.unrecognized()) {

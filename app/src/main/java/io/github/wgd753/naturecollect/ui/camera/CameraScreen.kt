@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +70,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,7 +98,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ml.PromptPoint
+import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.StickerImage
+import io.github.wgd753.naturecollect.ui.cutout.SubjectPicker
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.theme.Card
@@ -113,6 +117,14 @@ fun CameraScreen(onOpenCapture: (String) -> Unit) {
     val container = rememberContainer()
     val vm: CameraViewModel = viewModel { CameraViewModel(container) }
     val stage by vm.stage.collectAsState()
+
+    // Back steps out of the current photo instead of leaving the camera.
+    BackHandler(enabled = stage != CameraStage.Live) { vm.reset() }
+    // Coming back to the camera later should show the viewfinder, not an old result card.
+    val latestStage by rememberUpdatedState(stage)
+    DisposableEffect(Unit) {
+        onDispose { if (latestStage is CameraStage.Saved || latestStage is CameraStage.Failed) vm.reset() }
+    }
 
     AnimatedContent(
         targetState = stage,
@@ -480,7 +492,7 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PillButton("重拍", onClick = vm::reset)
-                PillButton("换个主体", onClick = vm::startSelecting)
+                PillButton("圈选主体", onClick = vm::startSelecting)
                 PillButton("直接保存", primary = true) {
                     if (!flying) {
                         flying = true
@@ -517,24 +529,9 @@ private fun Modifier.pointerInputPeel(
     },
 )
 
-@Composable
-private fun PillButton(text: String, primary: Boolean = false, onClick: () -> Unit) {
-    Text(
-        text = text,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (primary) MaterialTheme.colorScheme.primary else Card)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 11.dp),
-        color = if (primary) Color.White else MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleMedium,
-    )
-}
-
-/** Tap the object you want; the highlight shows what will be cut out. */
+/** Circle (or tap) the object you want; the highlight shows what will be cut out. */
 @Composable
 private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
-    val bitmap = stage.image.bitmap
     Column(
         Modifier
             .fillMaxSize()
@@ -542,42 +539,26 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "点一下你想收集的东西",
-            modifier = Modifier.padding(vertical = 8.dp),
+            text = "用手指圈出你想收集的东西",
+            modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
+        Text(
+            text = "圈得松一点没关系；也可以只点一下",
+            modifier = Modifier.padding(bottom = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .aspectRatio(bitmap.width.toFloat() / bitmap.height)
-                    .clip(RoundedCornerShape(20.dp))
-                    .pointerInput(bitmap) {
-                        detectTapGestures { tap ->
-                            vm.select(
-                                PromptPoint(
-                                    x = tap.x / size.width * bitmap.width,
-                                    y = tap.y / size.height * bitmap.height,
-                                ),
-                            )
-                        }
-                    },
-            ) {
-                Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
-                stage.overlay?.let {
-                    Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
-                }
-                if (stage.busy) {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
-                }
-            }
+            SubjectPicker(stage.image.bitmap, stage.overlay, stage.busy, onPrompt = vm::select)
         }
         Row(
             Modifier.padding(top = 16.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PillButton("重拍", onClick = vm::reset)
-            PillButton("就它了", primary = true, onClick = vm::confirmSelection)
+            PillButton("就它了", primary = true, enabled = !stage.busy, onClick = vm::confirmSelection)
         }
     }
 }

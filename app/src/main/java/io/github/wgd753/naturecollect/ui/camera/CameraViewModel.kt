@@ -1,13 +1,14 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.wgd753.naturecollect.AppContainer
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ml.SamImage
+import io.github.wgd753.naturecollect.ml.SamPrompt
+import io.github.wgd753.naturecollect.ui.cutout.maskOverlay
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -42,7 +43,6 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
     private var photo: Bitmap? = null
     private var takenAt: Long = 0
     private var latLng: DoubleArray? = null
-    private var points: List<PromptPoint> = emptyList()
     private var pendingSticker: Bitmap? = null
     private var job: Job? = null
 
@@ -58,8 +58,7 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
             try {
                 val image = container.segmenter.encode(bitmap)
                 // Default prompt: whatever is in the middle of the frame.
-                points = listOf(PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f))
-                val alpha = container.segmenter.segment(image, points)
+                val alpha = container.segmenter.segment(image, listOf(PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f)))
                 val sticker = StickerMaker.make(image.bitmap, alpha)
                 latLng = latLng ?: location?.await()?.let { doubleArrayOf(it.latitude, it.longitude) }
                 _stage.value = if (sticker != null) {
@@ -79,16 +78,16 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
         _stage.value = CameraStage.Selecting(stage.image, overlay = null, busy = false)
     }
 
-    /** Re-runs only the fast decoder for a new tap. */
-    fun select(point: PromptPoint) {
+    /** Re-runs only the fast decoder for a new tap or loop. */
+    fun select(prompt: SamPrompt) {
         val stage = _stage.value as? CameraStage.Selecting ?: return
         job?.cancel()
         _stage.value = stage.copy(busy = true)
         job = viewModelScope.launch {
-            points = listOf(point)
-            val alpha = container.segmenter.segment(stage.image, points)
+            val alpha = container.segmenter.segment(stage.image, prompt)
             pendingSticker = StickerMaker.make(stage.image.bitmap, alpha)
-            _stage.value = CameraStage.Selecting(stage.image, overlay = maskOverlay(alpha, stage.image.bitmap), busy = false)
+            val overlay = maskOverlay(alpha, stage.image.bitmap.width, stage.image.bitmap.height)
+            _stage.value = CameraStage.Selecting(stage.image, overlay = overlay, busy = false)
         }
     }
 
@@ -133,16 +132,5 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
         val frame = e.stackTrace.firstOrNull { it.className.startsWith("io.github.wgd753") }
         val where = frame?.let { "\n${it.fileName}:${it.lineNumber}" }.orEmpty()
         return (e.message ?: e.javaClass.simpleName) + where
-    }
-
-    /** Ink-blue translucent highlight over the selected object. */
-    private fun maskOverlay(alpha: FloatArray, image: Bitmap): Bitmap {
-        val w = image.width
-        val h = image.height
-        val pixels = IntArray(w * h) { i ->
-            val a = (alpha[i] * 140).toInt().coerceIn(0, 255)
-            Color.argb(a, 70, 90, 255)
-        }
-        return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
     }
 }

@@ -12,8 +12,10 @@ import kotlin.math.roundToInt
 /** Decodes a picked image, downsampled to [maxSide] and rotated upright per EXIF. */
 fun loadBitmap(context: Context, uri: Uri, maxSide: Int = 2048): Bitmap? {
     val resolver = context.contentResolver
+    // A bounds-only decode always returns null, so check the stream and the sizes separately.
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+    val stream = resolver.openInputStream(uri) ?: return null
+    stream.use { BitmapFactory.decodeStream(it, null, bounds) }
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     var sample = 1
     while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2

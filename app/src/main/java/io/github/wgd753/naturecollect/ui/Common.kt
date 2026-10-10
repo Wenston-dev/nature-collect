@@ -150,6 +150,22 @@ fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
+/** Rounded text button used on photo screens. */
+@Composable
+fun PillButton(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (primary) MaterialTheme.colorScheme.primary else Card)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 11.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.4f },
+        color = if (primary) Color.White else MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.titleMedium,
+    )
+}
+
 /** Small rounded label, e.g. a category or a status. */
 @Composable
 fun Tag(text: String, modifier: Modifier = Modifier, color: Color = InkSoft.copy(alpha = 0.25f)) {

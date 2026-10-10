@@ -17,6 +17,14 @@ import kotlin.math.roundToInt
 /** A tap on the image, in the coordinates of [SamImage.bitmap]. */
 data class PromptPoint(val x: Float, val y: Float, val positive: Boolean = true)
 
+/** What the user pointed at: taps, or a loop drawn around the subject. */
+sealed interface SamPrompt {
+    data class Points(val points: List<PromptPoint>) : SamPrompt
+
+    /** A freehand loop, in bitmap coordinates. Its bounding box becomes SAM's box prompt. */
+    data class Lasso(val path: List<PromptPoint>) : SamPrompt
+}
+
 /** An image that has been run through the encoder, ready for fast prompting. */
 class SamImage internal constructor(
     /** The image scaled so its longest side is [SamSegmenter.INPUT_SIZE]. */
@@ -101,24 +109,42 @@ class SamSegmenter(private val context: Context) {
         SamImage(scaled, embedding)
     }
 
+    /** Shorthand for a tap prompt. */
+    suspend fun segment(image: SamImage, points: List<PromptPoint>): FloatArray =
+        segment(image, SamPrompt.Points(points))
+
     /**
      * Returns a soft alpha mask (0..1) the size of [image]'s bitmap for the
-     * object under [points].
+     * object the prompt points at.
      */
-    suspend fun segment(image: SamImage, points: List<PromptPoint>): FloatArray = withContext(Dispatchers.Default) {
+    suspend fun segment(image: SamImage, prompt: SamPrompt): FloatArray = withContext(Dispatchers.Default) {
         val (_, dec) = sessions()
         val w = image.bitmap.width
         val h = image.bitmap.height
-        // SAM expects a padding point with label -1 when no box is given.
-        val n = points.size + 1
-        val coords = FloatArray(n * 2)
-        val labels = FloatArray(n)
-        points.forEachIndexed { i, p ->
-            coords[i * 2] = p.x
-            coords[i * 2 + 1] = p.y
-            labels[i] = if (p.positive) 1f else 0f
+        val coords: FloatArray
+        val labels: FloatArray
+        when (prompt) {
+            is SamPrompt.Points -> {
+                // SAM expects a padding point with label -1 when no box is given.
+                val n = prompt.points.size + 1
+                coords = FloatArray(n * 2)
+                labels = FloatArray(n)
+                prompt.points.forEachIndexed { i, p ->
+                    coords[i * 2] = p.x
+                    coords[i * 2 + 1] = p.y
+                    labels[i] = if (p.positive) 1f else 0f
+                }
+                labels[n - 1] = -1f
+            }
+            is SamPrompt.Lasso -> {
+                // Box corners use labels 2 (top-left) and 3 (bottom-right); no padding point.
+                val xs = prompt.path.map { it.x.coerceIn(0f, w - 1f) }
+                val ys = prompt.path.map { it.y.coerceIn(0f, h - 1f) }
+                coords = floatArrayOf(xs.min(), ys.min(), xs.max(), ys.max())
+                labels = floatArrayOf(2f, 3f)
+            }
         }
-        labels[n - 1] = -1f
+        val n = labels.size
 
         val inputs = mapOf(
             "image_embeddings" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.embedding), longArrayOf(1, 256, 64, 64)),
@@ -133,11 +159,41 @@ class SamSegmenter(private val context: Context) {
                 val masks = result[0] as OnnxTensor
                 val buffer = masks.floatBuffer
                 val logits = FloatArray(w * h).also { buffer.get(it) }
-                MaskOps.toAlpha(logits, w, h, points.filter { it.positive })
+                when (prompt) {
+                    is SamPrompt.Points -> MaskOps.toAlpha(logits, w, h, prompt.points.filter { it.positive })
+                    is SamPrompt.Lasso -> {
+                        val alpha = MaskOps.toAlpha(logits, w, h, emptyList())
+                        val inside = lassoMask(prompt.path, w, h)
+                        // Nothing outside the drawn loop (plus a little slack) ends up on the sticker.
+                        for (i in alpha.indices) if (!inside[i]) alpha[i] = 0f
+                        alpha
+                    }
+                }
             }
         } finally {
             inputs.values.forEach { it.close() }
         }
+    }
+
+    /** Rasterises the loop, grown by a few percent so a loose circle doesn't clip the subject. */
+    private fun lassoMask(path: List<PromptPoint>, w: Int, h: Int): BooleanArray {
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
+        val canvas = android.graphics.Canvas(bitmap)
+        val shape = android.graphics.Path().apply {
+            path.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            close()
+        }
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.FILL_AND_STROKE
+            strokeWidth = max(w, h) * 0.06f
+            strokeJoin = android.graphics.Paint.Join.ROUND
+        }
+        canvas.drawPath(shape, paint)
+        val bytes = java.nio.ByteBuffer.allocate(bitmap.rowBytes * h)
+        bitmap.copyPixelsToBuffer(bytes)
+        val row = bitmap.rowBytes
+        bitmap.recycle()
+        return BooleanArray(w * h) { i -> bytes.get((i / w) * row + i % w).toInt() != 0 }
     }
 
     companion object {

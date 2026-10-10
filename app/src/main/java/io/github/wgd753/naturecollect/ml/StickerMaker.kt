@@ -73,6 +73,37 @@ object StickerMaker {
         return out
     }
 
+    /** A whole photo as a sticker: white rounded frame and the same soft shadow. */
+    fun framed(photo: Bitmap, maxSide: Int = 1024): Bitmap {
+        val scale = minOf(1f, maxSide.toFloat() / max(photo.width, photo.height))
+        val w = (photo.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (photo.height * scale).roundToInt().coerceAtLeast(1)
+        val border = max(8f, max(w, h) * 0.03f)
+        val shadow = border
+        val margin = (border + shadow * 2).roundToInt()
+        val out = Bitmap.createBitmap(w + margin * 2, h + margin * 2, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val frame = android.graphics.RectF(margin - border, margin - border, margin + w + border, margin + h + border)
+        val radius = border * 1.2f
+        canvas.drawRoundRect(
+            android.graphics.RectF(frame).apply { offset(0f, shadow * 0.6f) },
+            radius,
+            radius,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(46, 40, 30, 20)
+                maskFilter = BlurMaskFilter(shadow, BlurMaskFilter.Blur.NORMAL)
+            },
+        )
+        canvas.drawRoundRect(frame, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        canvas.drawBitmap(
+            Bitmap.createScaledBitmap(photo, w, h, true),
+            margin.toFloat(),
+            margin.toFloat(),
+            Paint(Paint.FILTER_BITMAP_FLAG),
+        )
+        return out
+    }
+
     /** The sticker composited onto white, for sending to the recogniser. */
     fun onWhite(sticker: Bitmap, maxSide: Int = 768): Bitmap {
         val scale = minOf(1f, maxSide.toFloat() / max(sticker.width, sticker.height))
