@@ -1,6 +1,10 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.graphics.Bitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import io.github.wgd753.naturecollect.ml.SamPrompt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.wgd753.naturecollect.AppContainer
@@ -21,8 +25,12 @@ import io.github.wgd753.naturecollect.ui.tr
 sealed interface CameraStage {
     data object Live : CameraStage
 
-    /** Encoder running on the new photo. */
-    data class Finding(val photo: Bitmap) : CameraStage
+    /**
+     * Encoder running on the new photo. Once SAM answers, [layers] holds its
+     * candidate masks as outline bitmaps (smallest first) and [chosen] the one
+     * that becomes the sticker, so the screen can show the layering for a beat.
+     */
+    data class Finding(val photo: Bitmap, val layers: List<Bitmap> = emptyList(), val chosen: Int = -1) : CameraStage
 
     /** A sticker is ready to be peeled off. */
     data class Sticker(val image: SamImage, val sticker: Bitmap) : CameraStage
@@ -60,8 +68,18 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
             try {
                 val image = container.segmenter.encode(bitmap)
                 // Default prompt: whatever is in the middle of the frame.
-                val alpha = container.segmenter.segment(image, listOf(PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f)))
-                val sticker = StickerMaker.make(image.bitmap, alpha)
+                val center = PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f)
+                val result = container.segmenter.segmentOptions(image, SamPrompt.Points(listOf(center)))
+                val alpha = result.alphas.getOrNull(result.defaultIndex)
+                    ?: FloatArray(image.bitmap.width * image.bitmap.height)
+                val (sticker, layers) = withContext(Dispatchers.Default) {
+                    StickerMaker.make(image.bitmap, alpha) to
+                        result.alphas.map { LayerArt.outline(it, image.bitmap.width, image.bitmap.height) }
+                }
+                if (sticker != null && layers.isNotEmpty()) {
+                    _stage.value = CameraStage.Finding(bitmap, layers, result.defaultIndex)
+                    delay(LayerArt.showMillis(layers.size))
+                }
                 latLng = latLng ?: location?.await()?.let { doubleArrayOf(it.latitude, it.longitude) }
                 _stage.value = if (sticker != null) {
                     CameraStage.Sticker(image, sticker)

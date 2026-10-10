@@ -79,9 +79,9 @@ private const val CATEGORIES_ROUTE = "categories"
 enum class Tab(val route: String, private val zh: String, private val en: String, val icon: ImageVector) {
     Board("board", "贴纸板", "Board", Icons.Outlined.AutoAwesomeMosaic),
     Camera("camera", "拍照", "Camera", Icons.Outlined.PhotoCamera),
-    Calendar("calendar", "日历", "Calendar", Icons.Outlined.CalendarMonth),
+    Calendar("calendar", "日历", "Diary", Icons.Outlined.CalendarMonth),
     Globe("globe", "地图", "Map", Icons.Outlined.Public),
-    Collection("collection", "图鉴", "Collection", Icons.AutoMirrored.Outlined.MenuBook);
+    Collection("collection", "图鉴", "Finds", Icons.AutoMirrored.Outlined.MenuBook);
 
     val label: String get() = tr(zh, en)
 }
@@ -235,6 +235,6 @@ private fun RowScope.NavItem(tab: Tab, current: Tab?, onSelect: (Tab) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
-        Text(tab.label, color = tint, style = MaterialTheme.typography.labelMedium)
+        Text(tab.label, color = tint, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
     }
 }

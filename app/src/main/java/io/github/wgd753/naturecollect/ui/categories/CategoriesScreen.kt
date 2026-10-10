@@ -1,5 +1,21 @@
 package io.github.wgd753.naturecollect.ui.categories
 
+import androidx.compose.material.icons.outlined.DragHandle
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -83,45 +99,97 @@ fun CategoriesScreen(onBack: () -> Unit) {
             Text(tr("分类管理", "Categories"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
             TextButton(onClick = { confirmReset = true }) { Text(tr("恢复默认", "Reset")) }
         }
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding = PaddingValues(16.dp),
+        // Long-press a row and drag to reorder; the new order is saved on release.
+        var order by remember(categories) { mutableStateOf(categories) }
+        var draggingKey by remember { mutableStateOf<String?>(null) }
+        var dragOffset by remember { mutableFloatStateOf(0f) }
+        val spacing = with(LocalDensity.current) { 10.dp.toPx() }
+        val haptics = LocalHapticFeedback.current
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            itemsIndexed(categories, key = { _, c -> c.key }) { index, category ->
-                Row(
-                    Modifier
-                        .animateItem()
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { editing = category }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(category.tint.copy(alpha = 0.18f)),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(category.emoji, fontSize = 22.sp) }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(category.display, fontWeight = FontWeight.Bold, color = category.tint)
-                        Text(
-                            category.hint ?: tr("没有说明", "No hint"),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+            order.forEach { category ->
+                key(category.key) {
+                    val dragging = draggingKey == category.key
+                    var rowHeight by remember { mutableIntStateOf(0) }
+                    val lift by animateDpAsState(if (dragging) 10.dp else 0.dp, label = "lift")
+                    Row(
+                        Modifier
+                            .zIndex(if (dragging) 1f else 0f)
+                            .onSizeChanged { rowHeight = it.height }
+                            .graphicsLayer {
+                                translationY = if (dragging) dragOffset else 0f
+                                val sc = if (dragging) 1.03f else 1f
+                                scaleX = sc
+                                scaleY = sc
+                            }
+                            .shadow(lift, RoundedCornerShape(20.dp))
+                            .pointerInput(category.key) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggingKey = category.key
+                                        dragOffset = 0f
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                        val step = rowHeight + spacing
+                                        val i = order.indexOfFirst { it.key == category.key }
+                                        if (dragOffset > step / 2 && i in 0 until order.lastIndex) {
+                                            order = order.move(i, i + 1)
+                                            dragOffset -= step
+                                        } else if (dragOffset < -step / 2 && i > 0) {
+                                            order = order.move(i, i - 1)
+                                            dragOffset += step
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingKey = null
+                                        dragOffset = 0f
+                                        if (order != categories) save(order)
+                                    },
+                                    onDragCancel = {
+                                        draggingKey = null
+                                        dragOffset = 0f
+                                        order = categories
+                                    },
+                                )
+                            }
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { editing = category }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.size(44.dp).clip(CircleShape).background(category.tint.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(category.emoji, fontSize = 22.sp) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(category.display, fontWeight = FontWeight.Bold, color = category.tint)
+                            Text(
+                                category.hint ?: tr("没有说明", "No hint"),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                        Icon(
+                            Icons.Outlined.DragHandle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         )
-                    }
-                    IconButton(onClick = { save(categories.move(index, index - 1)) }, enabled = index > 0) {
-                        Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = tr("上移", "Move up"))
-                    }
-                    IconButton(onClick = { save(categories.move(index, index + 1)) }, enabled = index < categories.lastIndex) {
-                        Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = tr("下移", "Move down"))
                     }
                 }
             }
-            item {
+            run {
                 Row(
                     Modifier
                         .fillMaxWidth()

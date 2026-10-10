@@ -98,7 +98,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val captures by container.captures.observeAll().collectAsState(initial = emptyList())
     var filter by rememberSaveable { mutableStateOf<Category?>(null) }
-    val located = captures.filter { it.latitude != null && it.longitude != null }
+    val located = captures.filter(::hasPlace)
     val shown = located.filter { filter == null || Category.fromKey(it.category).key == filter?.key }
     val source by container.settings.mapSource.collectAsState()
     val amap = source == Settings.MAP_AMAP
@@ -136,6 +136,8 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
             map = m
             m.uiSettings.isRotateGesturesEnabled = false
             m.uiSettings.isCompassEnabled = false
+            m.uiSettings.isLogoEnabled = false
+            m.uiSettings.isAttributionEnabled = false
             m.cameraPosition = org.maplibre.android.camera.CameraPosition.Builder()
                 .target(LatLng(34.0, 108.0))
                 .zoom(3.0)
@@ -264,6 +266,17 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     }
 }
 
+/**
+ * Only real positions go on the map. Older imports may carry 0,0 (a location
+ * the system redacted), which would drag the camera out to the empty ocean.
+ */
+private fun hasPlace(c: CaptureEntity): Boolean {
+    val lat = c.latitude ?: return false
+    val lon = c.longitude ?: return false
+    if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return false
+    return kotlin.math.abs(lat) > 0.01 || kotlin.math.abs(lon) > 0.01
+}
+
 /** Where to draw a capture: shifted to GCJ-02 on 高德 tiles, raw GPS otherwise. */
 private fun displayCoords(capture: CaptureEntity, amap: Boolean): Pair<Double, Double> {
     val lat = capture.latitude!!
@@ -272,7 +285,7 @@ private fun displayCoords(capture: CaptureEntity, amap: Boolean): Pair<Double, D
 }
 
 private fun fitTo(map: MapLibreMap, captures: List<CaptureEntity>, amap: Boolean) {
-    val points = captures.filter { it.latitude != null && it.longitude != null }
+    val points = captures.filter(::hasPlace)
         .map { c -> displayCoords(c, amap).let { (lat, lon) -> LatLng(lat, lon) } }
     when {
         points.isEmpty() -> Unit

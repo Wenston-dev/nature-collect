@@ -1,6 +1,14 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.Manifest
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.foundation.Canvas
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.produceState
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
@@ -162,7 +170,7 @@ fun CameraScreen(onOpenCapture: (String) -> Unit) {
     ) { current ->
         when (current) {
             CameraStage.Live -> LiveCamera(vm)
-            is CameraStage.Finding -> FindingSubject(current.photo)
+            is CameraStage.Finding -> FindingSubject(vm, current.photo)
             is CameraStage.Sticker -> StickerReveal(current, vm)
             is CameraStage.Selecting -> SelectSubject(current, vm)
             is CameraStage.Saved -> SavedCard(current.captureId, vm, onOpenCapture)
@@ -448,123 +456,109 @@ private fun ViewfinderCorners(modifier: Modifier) {
     )
 }
 
-private class Sparkle(val x: Float, val y: Float, val radius: Float, val phase: Float, val speed: Float, val color: Color)
-
-private val AuroraColors = listOf(
-    Color(0xFF7FE0B5), Color(0xFF7CC8FF), Color(0xFFB59CFF), Color(0xFFF0775A), Color(0xFFF5B83D), Color(0xFF7FE0B5),
-)
+private val ScanTint = Color(0xFF9BE8C8)
 
 /**
- * While SAM encodes the photo: an aurora scan line combs over it, lighting up a
- * dot grid as it passes, stars twinkle and drift, and a rainbow rim flows
- * around the frame. Everything runs off one frame clock.
+ * While SAM works: the photo dims and a single scan line combs down it,
+ * lighting up the photo's own edges as it passes. When the masks come back,
+ * SAM's candidate layers (smallest to largest) trace out one after another
+ * and the chosen one settles, just before the sticker pops out.
  */
 @Composable
-private fun FindingSubject(photo: Bitmap) {
-    val sparkles = remember(photo) {
-        val rnd = kotlin.random.Random(photo.width * 31 + photo.height)
-        val palette = listOf(Color.White, Color(0xFFF5B83D), Color(0xFF7FE0B5), Color(0xFFB59CFF), Color(0xFFFFD6E0))
-        List(30) {
-            Sparkle(rnd.nextFloat(), rnd.nextFloat(), 4f + rnd.nextFloat() * 9f, rnd.nextFloat(), 0.35f + rnd.nextFloat() * 0.7f, palette[rnd.nextInt(palette.size)])
+private fun FindingSubject(vm: CameraViewModel, photo: Bitmap) {
+    val stage by vm.stage.collectAsState()
+    val finding = stage as? CameraStage.Finding
+    val layers = finding?.layers.orEmpty()
+    val chosen = finding?.chosen ?: -1
+
+    val edges by produceState<ImageBitmap?>(null, photo) {
+        value = withContext(Dispatchers.Default) { LayerArt.edges(photo).asImageBitmap() }
+    }
+    val layerImages = remember(layers) { layers.map { it.asImageBitmap() } }
+    val layerAlpha = remember(layers) { layers.map { Animatable(0f) } }
+    val scanFade = remember { Animatable(1f) }
+    LaunchedEffect(layers) {
+        if (layers.isEmpty()) return@LaunchedEffect
+        launch { scanFade.animateTo(0f, tween(300)) }
+        layerAlpha.forEachIndexed { i, a ->
+            launch {
+                delay(260L * i)
+                a.animateTo(1f, tween(220))
+                if (i != chosen) a.animateTo(0.35f, tween(260))
+            }
         }
+        delay(260L * layers.size + 80)
+        layerAlpha.forEachIndexed { i, a -> launch { a.animateTo(if (i == chosen) 1f else 0f, tween(300)) } }
     }
-    var time by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val start = withFrameNanos { it }
-        while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
-    }
+
+    val transition = rememberInfiniteTransition(label = "scan")
+    val sweep by transition.animateFloat(
+        initialValue = -0.08f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(tween(1700, easing = FastOutSlowInEasing)),
+        label = "sweep",
+    )
     val intro = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { intro.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(Unit) { intro.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
 
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .graphicsLayer {
-                    val s = 0.92f + 0.08f * intro.value
-                    scaleX = s
-                    scaleY = s
-                    alpha = intro.value
+                    val sc = 0.96f + 0.04f * intro.value
+                    scaleX = sc
+                    scaleY = sc
                 }
+                .clip(RoundedCornerShape(28.dp))
                 .drawWithContent {
                     drawContent()
-                    // Flowing rainbow rim with a soft glow built from stacked strokes.
-                    val a = time * 1.4f
-                    val r = size.maxDimension
-                    val c = Offset(size.width / 2, size.height / 2)
-                    val dir = Offset(kotlin.math.cos(a), kotlin.math.sin(a)) * r
-                    val brush = Brush.linearGradient(AuroraColors, start = c - dir, end = c + dir)
-                    val corner = CornerRadius(28.dp.toPx())
-                    listOf(18f to 0.08f, 10f to 0.16f, 5f to 0.35f, 2.5f to 1f).forEach { (w, alpha) ->
-                        drawRoundRect(brush, cornerRadius = corner, style = Stroke(w.dp.toPx()), alpha = alpha * intro.value)
+                    val w = size.width
+                    val h = size.height
+                    drawRect(Color.Black.copy(alpha = 0.32f * intro.value))
+                    val dst = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt())
+
+                    val fade = scanFade.value
+                    val e = edges
+                    if (fade > 0f && e != null) {
+                        val y = sweep * h
+                        val band = 70.dp.toPx()
+                        // Edges already passed stay faintly lit; the strip right behind the line glows.
+                        clipRect(top = 0f, bottom = y.coerceIn(0f, h)) {
+                            drawImage(e, dstSize = dst, alpha = 0.16f * fade, colorFilter = ColorFilter.tint(ScanTint, BlendMode.SrcIn))
+                        }
+                        for (k in 0 until 4) {
+                            val top = y - band * (k + 1) / 4f
+                            clipRect(top = top.coerceIn(0f, h), bottom = (y - band * k / 4f).coerceIn(0f, h)) {
+                                drawImage(e, dstSize = dst, alpha = (0.9f - k * 0.2f) * fade, colorFilter = ColorFilter.tint(ScanTint, BlendMode.SrcIn))
+                            }
+                        }
+                        drawRect(
+                            Brush.verticalGradient(listOf(Color.Transparent, ScanTint.copy(alpha = 0.22f * fade)), startY = y - band, endY = y),
+                            topLeft = Offset(0f, y - band),
+                            size = Size(w, band),
+                        )
+                        drawRect(Color.White.copy(alpha = 0.95f * fade), topLeft = Offset(0f, y - 1.dp.toPx()), size = Size(w, 2.dp.toPx()))
+                    }
+
+                    layerImages.forEachIndexed { i, img ->
+                        val a = layerAlpha.getOrNull(i)?.value ?: 0f
+                        if (a > 0f) {
+                            val tint = if (i == chosen) Color.White else ScanTint
+                            drawImage(img, dstSize = dst, alpha = a, colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn))
+                        }
                     }
                 },
         ) {
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(28.dp))
-                    .drawWithContent {
-                        drawContent()
-                        val t = time
-                        val w = size.width
-                        val h = size.height
-                        drawRect(Color(0xFF0B1A14).copy(alpha = 0.22f + 0.06f * kotlin.math.sin(t * 2f)))
-
-                        val p = kotlin.math.sin(t * 1.5f) * 0.5f + 0.5f
-                        val y = p * h
-                        val band = 46.dp.toPx()
-                        val hue = AuroraColors[((t * 0.6f).toInt()) % (AuroraColors.size - 1)]
-
-                        // Dot grid that lights up near the scan line.
-                        val step = 18.dp.toPx()
-                        var gy = step / 2
-                        while (gy < h) {
-                            val d = kotlin.math.abs(gy - y)
-                            if (d < band * 2.2f) {
-                                val k = 1f - d / (band * 2.2f)
-                                var gx = step / 2
-                                while (gx < w) {
-                                    drawCircle(Color.White, radius = 1.4.dp.toPx() * (0.6f + k), center = Offset(gx, gy), alpha = k * 0.75f)
-                                    gx += step
-                                }
-                            }
-                            gy += step
-                        }
-                        // Aurora haze and the bright line itself.
-                        drawRect(
-                            Brush.verticalGradient(listOf(Color.Transparent, hue.copy(alpha = 0.38f), Color.Transparent), startY = y - band * 2, endY = y + band * 2),
-                        )
-                        val lineBrush = Brush.horizontalGradient(AuroraColors)
-                        drawRect(lineBrush, topLeft = Offset(0f, y - 7.dp.toPx()), size = Size(w, 14.dp.toPx()), alpha = 0.25f)
-                        drawRect(lineBrush, topLeft = Offset(0f, y - 1.5.dp.toPx()), size = Size(w, 3.dp.toPx()))
-                        drawRect(Color.White, topLeft = Offset(0f, y - 0.5.dp.toPx()), size = Size(w, 1.dp.toPx()), alpha = 0.9f)
-
-                        // Twinkling four-point stars drifting upward.
-                        sparkles.forEach { sp ->
-                            val life = (t * sp.speed + sp.phase) % 1f
-                            val alpha = kotlin.math.sin(life * kotlin.math.PI.toFloat())
-                            val rad = sp.radius.dp.toPx() * (0.5f + 0.5f * alpha)
-                            val center = Offset(sp.x * w, sp.y * h - life * 60.dp.toPx())
-                            drawCircle(sp.color, radius = rad * 1.3f, center = center, alpha = alpha * 0.18f)
-                            val q = rad * 0.22f
-                            val star = Path().apply {
-                                moveTo(center.x, center.y - rad)
-                                lineTo(center.x + q, center.y - q)
-                                lineTo(center.x + rad, center.y)
-                                lineTo(center.x + q, center.y + q)
-                                lineTo(center.x, center.y + rad)
-                                lineTo(center.x - q, center.y + q)
-                                lineTo(center.x - rad, center.y)
-                                lineTo(center.x - q, center.y - q)
-                                close()
-                            }
-                            drawPath(star, sp.color, alpha = alpha)
-                        }
-                    },
-            ) {
-                Image(photo.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit)
-            }
+            Image(photo.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit)
         }
-        HintChip(tr("寻找主体", "Finding subject"), Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp), icon = Icons.Outlined.AutoAwesome)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = layers.isEmpty(),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            HintChip(tr("寻找主体", "Finding the subject"))
+        }
     }
 }
 
@@ -599,8 +593,14 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
     val fade = remember { Animatable(1f) }
     var flying by remember { mutableStateOf(false) }
 
+    val separate = remember { Animatable(0f) }
+    val burst = remember { Animatable(0f) }
     LaunchedEffect(stage.sticker) {
         pop.snapTo(0.3f)
+        separate.snapTo(0f)
+        burst.snapTo(0f)
+        launch { separate.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+        launch { burst.animateTo(1f, tween(750, easing = LinearOutSlowInEasing)) }
         pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
     }
 
@@ -611,10 +611,25 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
         Image(
             bitmap = stage.image.bitmap.asImageBitmap(),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize().blur(28.dp),
+            modifier = Modifier.fillMaxSize().blur(28.dp * separate.value),
             contentScale = ContentScale.Crop,
         )
-        Box(Modifier.fillMaxSize().background(Paper.copy(alpha = 0.35f)))
+        Box(Modifier.fillMaxSize().background(Paper.copy(alpha = 0.35f * separate.value)))
+        // One quiet burst as the sticker pops: a few white and sunflower glints.
+        Canvas(Modifier.fillMaxSize()) {
+            val t = burst.value
+            if (t <= 0f || t >= 1f) return@Canvas
+            val c = Offset(size.width / 2, size.height / 2)
+            val base = size.minDimension * 0.28f
+            for (k in 0 until 7) {
+                val angle = (k / 7f) * 2f * kotlin.math.PI.toFloat() + 0.4f
+                val dist = base + size.minDimension * 0.16f * t
+                val p = c + Offset(kotlin.math.cos(angle), kotlin.math.sin(angle)) * dist
+                val r = (if (k % 2 == 0) 5.dp else 3.5.dp).toPx() * (1f - t * 0.5f)
+                val color = if (k % 3 == 0) Color(0xFFF5B83D) else Color.White
+                drawCircle(color, radius = r, center = p, alpha = 1f - t)
+            }
+        }
 
         Image(
             bitmap = stage.sticker.asImageBitmap(),

@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.wgd753.naturecollect"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.4.1"
 
         ndk {
             // Phones from the last several years are all 64-bit ARM; dropping the
