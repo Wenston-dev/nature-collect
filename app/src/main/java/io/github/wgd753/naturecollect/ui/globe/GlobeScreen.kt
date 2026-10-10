@@ -137,6 +137,8 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
             m.uiSettings.isRotateGesturesEnabled = false
             m.uiSettings.isCompassEnabled = false
             m.uiSettings.isLogoEnabled = false
+            // Below this the 高德 raster has no tiles and the map looks empty.
+            m.setMinZoomPreference(3.0)
             m.uiSettings.isAttributionEnabled = false
             m.cameraPosition = org.maplibre.android.camera.CameraPosition.Builder()
                 .target(LatLng(34.0, 108.0))
@@ -199,7 +201,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
         s.getSourceAs<GeoJsonSource>(SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
-    LaunchedEffect(map, style, recenter, filter) {
+    // Re-fit when the map is ready, the filter changes, or the captures finish loading.
+    val shownIds = remember(shown) { shown.map { it.id }.toSet() }
+    LaunchedEffect(map, style, recenter, filter, shownIds) {
         val m = map ?: return@LaunchedEffect
         if (style == null) return@LaunchedEffect
         fitTo(m, shown, amap)
@@ -285,15 +289,24 @@ private fun displayCoords(capture: CaptureEntity, amap: Boolean): Pair<Double, D
 }
 
 private fun fitTo(map: MapLibreMap, captures: List<CaptureEntity>, amap: Boolean) {
-    val points = captures.filter(::hasPlace)
+    val all = captures.filter(::hasPlace)
         .map { c -> displayCoords(c, amap).let { (lat, lon) -> LatLng(lat, lon) } }
-    when {
-        points.isEmpty() -> Unit
-        points.size == 1 -> map.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 14.0))
-        else -> {
-            val bounds = LatLngBounds.Builder().includes(points).build()
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
-        }
+    if (all.isEmpty()) return
+    // Frame where most finds are: one photo from far away (a trip, a bad GPS tag)
+    // shouldn't zoom the whole map out to an empty ocean.
+    val midLat = all.map { it.latitude }.sorted()[all.size / 2]
+    val midLon = all.map { it.longitude }.sorted()[all.size / 2]
+    val near = all.filter { kotlin.math.abs(it.latitude - midLat) < 8 && kotlin.math.abs(it.longitude - midLon) < 8 }
+    val points = near.ifEmpty { all }
+    val spread = maxOf(
+        points.maxOf { it.latitude } - points.minOf { it.latitude },
+        points.maxOf { it.longitude } - points.minOf { it.longitude },
+    )
+    if (points.size == 1 || spread < 0.002) {
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 14.0))
+    } else {
+        val bounds = LatLngBounds.Builder().includes(points).build()
+        map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
     }
 }
 
