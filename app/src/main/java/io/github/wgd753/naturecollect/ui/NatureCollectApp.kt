@@ -1,6 +1,15 @@
 package io.github.wgd753.naturecollect.ui
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.navigation.NavBackStackEntry
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesomeMosaic
@@ -48,6 +57,13 @@ enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Collection("collection", "图鉴", Icons.AutoMirrored.Outlined.MenuBook),
 }
 
+private val slideIn: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
+    slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(220))
+}
+private val slideOut: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
+    slideOutHorizontally(tween(240)) { it / 3 } + fadeOut(tween(200))
+}
+
 @Composable
 fun NatureCollectApp() {
     val navController = rememberNavController()
@@ -79,7 +95,7 @@ fun NatureCollectApp() {
                             selectedTextColor = MaterialTheme.colorScheme.primary,
                             unselectedIconColor = InkSoft,
                             unselectedTextColor = InkSoft,
-                            indicatorColor = Color.Transparent,
+                            indicatorColor = InkSoft.copy(alpha = 0.22f),
                         ),
                     )
                 }
@@ -90,6 +106,11 @@ fun NatureCollectApp() {
             navController = navController,
             startDestination = Tab.Collection.route,
             modifier = Modifier.padding(innerPadding),
+            // Quick cross-fades between tabs; detail pages slide in from the right.
+            enterTransition = { fadeIn(tween(220)) },
+            exitTransition = { fadeOut(tween(160)) },
+            popEnterTransition = { fadeIn(tween(220)) },
+            popExitTransition = { fadeOut(tween(160)) },
         ) {
             composable(Tab.Board.route) { BoardScreen() }
             composable(Tab.Camera.route) { CameraScreen(onOpenCapture = openCapture) }
@@ -101,21 +122,21 @@ fun NatureCollectApp() {
                     onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
                 )
             }
-            composable("species/{key}") { entry ->
+            composable("species/{key}", enterTransition = slideIn, popExitTransition = slideOut) { entry ->
                 SpeciesDetailScreen(
                     speciesKey = entry.arguments?.getString("key").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenCapture = openCapture,
                 )
             }
-            composable("capture/{id}") { entry ->
+            composable("capture/{id}", enterTransition = slideIn, popExitTransition = slideOut) { entry ->
                 CaptureDetailScreen(
                     captureId = entry.arguments?.getString("id").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenBoard = { selectTab(Tab.Board) },
                 )
             }
-            composable(SETTINGS_ROUTE) { SettingsScreen(onBack = { navController.popBackStack() }) }
+            composable(SETTINGS_ROUTE, enterTransition = slideIn, popExitTransition = slideOut) { SettingsScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

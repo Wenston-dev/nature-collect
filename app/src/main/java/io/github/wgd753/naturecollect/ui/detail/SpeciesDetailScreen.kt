@@ -18,7 +18,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +46,7 @@ import io.github.wgd753.naturecollect.ui.formatDate
 import io.github.wgd753.naturecollect.ui.formatDay
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.theme.Card
 
 @Composable
@@ -45,12 +54,36 @@ fun SpeciesDetailScreen(speciesKey: String, onBack: () -> Unit, onOpenCapture: (
     val container = rememberContainer()
     val captures by container.captures.observeAll().collectAsState(initial = null)
     val group = captures?.groupBySpecies()?.firstOrNull { it.key == speciesKey }
+    val scope = rememberCoroutineScope()
+    var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.primary)
             }
+            Spacer(Modifier.weight(1f))
+            if (group != null) {
+                IconButton(onClick = { confirmDelete = true }) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除这个物种", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        if (confirmDelete && group != null) {
+            AlertDialog(
+                onDismissRequest = { confirmDelete = false },
+                title = { Text("从图鉴删除「${group.name}」？") },
+                text = { Text("会删除它的全部 ${group.captures.size} 条记录、照片和贴纸板上的贴纸，删除后无法恢复。") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmDelete = false
+                        val ids = group.captures.map { it.id }
+                        scope.launch { container.captures.deleteAll(ids) }
+                        onBack()
+                    }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            )
         }
         if (group == null) {
             if (captures != null) EmptyState("🍃", "这个物种已经不在图鉴里了")
@@ -59,7 +92,7 @@ fun SpeciesDetailScreen(speciesKey: String, onBack: () -> Unit, onOpenCapture: (
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
             item {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    StickerImage(group.cover, Modifier.size(240.dp).holographic(0.35f, 3000))
+                    StickerImage(group.cover, Modifier.size(240.dp).holographic(0.35f, 2400))
                     Spacer(Modifier.height(12.dp))
                     Text(group.name, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                     group.nameSci?.let {
@@ -67,7 +100,7 @@ fun SpeciesDetailScreen(speciesKey: String, onBack: () -> Unit, onOpenCapture: (
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Tag("${group.category.emoji} ${group.category.label}")
+                        Tag("${group.category.emoji} ${group.category.label}", color = group.category.tint.copy(alpha = 0.22f))
                         Tag("遇见 ${group.captures.size} 次")
                         Tag("初遇 ${formatDay(group.firstSeen)}")
                     }

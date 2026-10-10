@@ -1,10 +1,7 @@
 package io.github.wgd753.naturecollect.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,7 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -129,7 +130,7 @@ fun CategoryFilterRow(
     ) {
         FilterPill(text = "全部", selected = selected == null) { onSelect(null) }
         Category.entries.filter { it in available }.forEach { category ->
-            FilterPill(text = "${category.emoji} ${category.label}", selected = selected == category) {
+            FilterPill(text = "${category.emoji} ${category.label}", selected = selected == category, tint = category.tint) {
                 onSelect(if (selected == category) null else category)
             }
         }
@@ -137,16 +138,19 @@ fun CategoryFilterRow(
 }
 
 @Composable
-fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit) {
+fun FilterPill(text: String, selected: Boolean, tint: Color? = null, onClick: () -> Unit) {
+    val accent = tint ?: MaterialTheme.colorScheme.primary
+    val bg by androidx.compose.animation.animateColorAsState(if (selected) accent else Card, label = "pillBg")
+    val fg by androidx.compose.animation.animateColorAsState(if (selected) Color.White else accent, label = "pillFg")
     Text(
         text = text,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) MaterialTheme.colorScheme.primary else Card)
+            .background(bg)
             .clickable(onClick = onClick)
             .padding(PaddingValues(horizontal = 16.dp, vertical = 9.dp)),
         style = MaterialTheme.typography.titleMedium,
-        color = if (selected) Color.White else MaterialTheme.colorScheme.primary,
+        color = fg,
     )
 }
 
@@ -181,23 +185,34 @@ fun Tag(text: String, modifier: Modifier = Modifier, color: Color = InkSoft.copy
 }
 
 /**
- * Holographic foil: a rainbow band sweeps across the sticker. SrcAtop keeps
- * the colour on the sticker's own pixels, so the transparent cut-out stays clear.
+ * Holographic foil: a rainbow band sweeps across the sticker a couple of
+ * times when it appears (or when [trigger] changes), then stops so idle
+ * screens don't redraw every frame. SrcAtop keeps the colour on the
+ * sticker's own pixels, so the transparent cut-out stays clear.
  */
-fun Modifier.holographic(intensity: Float = 0.45f, periodMs: Int = 2600): Modifier = composed {
-    val transition = rememberInfiniteTransition(label = "holo")
-    val phase by transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing), RepeatMode.Restart),
-        label = "holoPhase",
-    )
+fun Modifier.holographic(
+    intensity: Float = 0.45f,
+    periodMs: Int = 2600,
+    sweeps: Int = 2,
+    trigger: Any? = Unit,
+): Modifier = composed {
+    val phase = remember { Animatable(-1f) }
+    var active by remember { mutableStateOf(true) }
+    LaunchedEffect(trigger) {
+        active = true
+        repeat(sweeps) {
+            phase.snapTo(-1f)
+            phase.animateTo(2f, tween(periodMs, easing = LinearEasing))
+        }
+        active = false
+    }
+    if (!active) return@composed this
     this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
             val band = size.width * 0.9f
-            val startX = phase * size.width
+            val startX = phase.value * size.width
             val brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
@@ -205,7 +220,7 @@ fun Modifier.holographic(intensity: Float = 0.45f, periodMs: Int = 2600): Modifi
                     Color(0xFFFFF59A).copy(alpha = intensity),
                     Color(0xFF9AFFE0).copy(alpha = intensity),
                     Color(0xFF9AB8FF).copy(alpha = intensity),
-                    Color(0xFFFFFFFF).copy(alpha = intensity * 1.2f),
+                    Color(0xFFFFFFFF).copy(alpha = (intensity * 1.2f).coerceAtMost(1f)),
                     Color.Transparent,
                 ),
                 start = Offset(startX - band, 0f),
@@ -214,6 +229,17 @@ fun Modifier.holographic(intensity: Float = 0.45f, periodMs: Int = 2600): Modifi
             drawRect(brush = brush, blendMode = BlendMode.SrcAtop)
         }
 }
+
+/** Accent colour for a category, used for chips, badges and poster labels. */
+val Category.tint: Color
+    get() = when (this) {
+        Category.BIRD -> Color(0xFF3B82C4)
+        Category.FLOWER -> Color(0xFFE0619A)
+        Category.PLANT -> Color(0xFF3F9B5A)
+        Category.INSECT -> Color(0xFFE08A2E)
+        Category.ANIMAL -> Color(0xFF9A6A3F)
+        Category.OTHER -> Color(0xFF7C6FD6)
+    }
 
 fun formatDate(millis: Long): String =
     java.text.SimpleDateFormat("yyyy年M月d日 HH:mm", java.util.Locale.CHINA).format(java.util.Date(millis))

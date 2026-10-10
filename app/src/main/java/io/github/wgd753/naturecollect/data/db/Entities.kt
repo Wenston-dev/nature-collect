@@ -47,7 +47,11 @@ data class BoardEntity(
     val updatedAt: Long,
 )
 
-enum class BoardItemType { STICKER, TEXT, DRAWING }
+/**
+ * IMAGE is a sticker imported from the gallery: [BoardItemEntity.text] holds its
+ * media file name and [BoardItemEntity.pathData] its "width,height".
+ */
+enum class BoardItemType { STICKER, TEXT, DRAWING, IMAGE }
 
 /**
  * An element placed on a board. Positions are in board units: x/y are the

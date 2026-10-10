@@ -1,12 +1,16 @@
 package io.github.wgd753.naturecollect.ui.board
 
-import android.content.ContentValues
-import android.content.Context
 import android.graphics.Bitmap
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -45,7 +49,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material3.AlertDialog
@@ -93,6 +100,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.systemBarsPadding
+import coil3.compose.AsyncImage
+import io.github.wgd753.naturecollect.ui.camera.loadBitmap
+import io.github.wgd753.naturecollect.ui.cutout.CutoutDialog
+import io.github.wgd753.naturecollect.ui.theme.Paper
+import java.util.UUID
 import io.github.wgd753.naturecollect.data.db.BoardEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemType
@@ -107,7 +122,6 @@ import io.github.wgd753.naturecollect.ui.theme.InkSoft
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -128,6 +142,7 @@ fun BoardScreen() {
 
     var showNewBoard by remember { mutableStateOf(false) }
     var showBoardMenu by remember { mutableStateOf(false) }
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { container.boards.ensureDefaultBoard() }
 
@@ -152,7 +167,32 @@ fun BoardScreen() {
             }
         }
         if (board == null) return@Column
-        BoardEditor(board, captures, onBoardChange = { scope.launch { container.boards.updateBoard(it) } })
+        if (!fullscreen) {
+            BoardEditor(
+                board,
+                captures,
+                onBoardChange = { scope.launch { container.boards.updateBoard(it) } },
+                fullscreen = false,
+                onToggleFullscreen = { fullscreen = true },
+            )
+        }
+    }
+
+    if (fullscreen && board != null) {
+        Dialog(
+            onDismissRequest = { fullscreen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            Box(Modifier.fillMaxSize().background(Paper).systemBarsPadding()) {
+                BoardEditor(
+                    board,
+                    captures,
+                    onBoardChange = { scope.launch { container.boards.updateBoard(it) } },
+                    fullscreen = true,
+                    onToggleFullscreen = { fullscreen = false },
+                )
+            }
+        }
     }
 
     if (showNewBoard) {
@@ -184,7 +224,13 @@ fun BoardScreen() {
 private enum class Tool { MOVE, PEN }
 
 @Composable
-private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoardChange: (BoardEntity) -> Unit) {
+private fun BoardEditor(
+    board: BoardEntity,
+    captures: List<CaptureEntity>,
+    onBoardChange: (BoardEntity) -> Unit,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
+) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -195,9 +241,43 @@ private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoa
     var penColor by remember { mutableStateOf(InkColors.first()) }
     var showTextDialog by remember { mutableStateOf(false) }
     val exportLayer = rememberGraphicsLayer()
+    // In full screen the board gets the room; trays fold away until asked for.
+    var showTray by remember(fullscreen) { mutableStateOf(!fullscreen) }
+    var showBackground by remember(fullscreen) { mutableStateOf(!fullscreen) }
+    var importPhoto by remember { mutableStateOf<Bitmap?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri, maxSide = 1600) }
+                if (bitmap != null) importPhoto = bitmap else Toast.makeText(context, "这张图片打不开", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    BackHandler(enabled = tool == Tool.PEN) { tool = Tool.MOVE }
 
     Column(Modifier.fillMaxSize()) {
+        if (fullscreen) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(Icons.Outlined.FullscreenExit, contentDescription = "退出全屏", tint = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    board.name,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                )
+                FilterPill("背景", selected = showBackground) { showBackground = !showBackground }
+                FilterPill("素材", selected = showTray) { showTray = !showTray }
+            }
+        }
         // Background colour and pattern.
+        AnimatedVisibility(showBackground, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -221,21 +301,41 @@ private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoa
                 FilterPill(label, selected = board.pattern == index) { onBoardChange(board.copy(pattern = index)) }
             }
         }
+        }
 
-        // Asset tray: every sticker collected so far.
-        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("素材 ${captures.size}", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.weight(1f))
-            Text("点一下贴到画板上", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Asset tray: every sticker collected so far, plus importing from the gallery.
+        AnimatedVisibility(showTray, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        Column {
+        if (!fullscreen) {
+            Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("素材 ${captures.size}", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                Text("点一下贴到画板上", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item(key = "import") {
+                Column(
+                    Modifier
+                        .size(if (fullscreen) 60.dp else 72.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                        .border(1.5.dp, InkSoft, RoundedCornerShape(16.dp))
+                        .clickable { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("相册", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
             items(captures, key = { it.id }) { capture ->
                 Box(
                     Modifier
-                        .size(72.dp)
+                        .size(if (fullscreen) 60.dp else 72.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Card)
                         .clickable {
@@ -255,9 +355,11 @@ private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoa
                 ) { StickerImage(capture, Modifier.fillMaxSize()) }
             }
         }
+        }
+        }
 
         // The board itself.
-        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (fullscreen) 8.dp else 16.dp), contentAlignment = Alignment.Center) {
             BoxWithConstraints(
                 Modifier
                     .aspectRatio(3f / 4f)
@@ -340,11 +442,18 @@ private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoa
                 }) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "撤销一笔", tint = MaterialTheme.colorScheme.primary) }
             }
             Spacer(Modifier.weight(1f))
+            IconButton(onClick = onToggleFullscreen) {
+                Icon(
+                    if (fullscreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
+                    contentDescription = if (fullscreen) "退出全屏" else "全屏编辑",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             IconButton(onClick = {
                 selectedItemId = null
                 scope.launch {
                     val bitmap = exportLayer.toImageBitmap().asAndroidBitmap()
-                    val where = withContext(Dispatchers.IO) { saveToGallery(context, bitmap, board.name) }
+                    val where = withContext(Dispatchers.IO) { io.github.wgd753.naturecollect.export.Gallery.save(context, bitmap, board.name) }
                     Toast.makeText(context, "已保存到$where", Toast.LENGTH_SHORT).show()
                 }
             }) { Icon(Icons.Outlined.FileDownload, contentDescription = "导出图片", tint = MaterialTheme.colorScheme.primary) }
@@ -365,6 +474,18 @@ private fun BoardEditor(board: BoardEntity, captures: List<CaptureEntity>, onBoa
                             .clickable { penColor = color },
                     )
                 }
+            }
+        }
+    }
+
+    importPhoto?.let { photo ->
+        CutoutDialog(photo = photo, onDismiss = { importPhoto = null }) { sticker ->
+            importPhoto = null
+            scope.launch {
+                val name = "board-${UUID.randomUUID()}.png"
+                withContext(Dispatchers.IO) { container.media.savePng(name, sticker) }
+                selectedItemId = container.boards.addImage(board.id, name, sticker.width, sticker.height).id
+                tool = Tool.MOVE
             }
         }
     }
@@ -408,6 +529,7 @@ private fun TransformableItem(
     onCommit: (BoardItemEntity) -> Unit,
 ) {
     if (item.type == BoardItemType.STICKER && capture == null) return
+    val container = rememberContainer()
     var local by remember(item.id) { mutableStateOf(item) }
     var dragging by remember { mutableStateOf(false) }
     // Follow database changes, but never yank the item out from under a finger.
@@ -418,7 +540,15 @@ private fun TransformableItem(
     val density = LocalDensity.current
 
     val baseWidthPx = boardWidth * STICKER_BASE
-    val aspect = if (capture != null) capture.stickerHeight.toFloat() / capture.stickerWidth else 0.5f
+    val aspect = when {
+        capture != null -> capture.stickerHeight.toFloat() / capture.stickerWidth
+        item.type == BoardItemType.IMAGE -> item.pathData?.split(',')?.let { parts ->
+            val w = parts.getOrNull(0)?.toFloatOrNull()
+            val h = parts.getOrNull(1)?.toFloatOrNull()
+            if (w != null && h != null && w > 0f) h / w else null
+        } ?: 1f
+        else -> 0.5f
+    }
     val widthDp = with(density) { baseWidthPx.toDp() }
 
     Box(
@@ -490,6 +620,14 @@ private fun TransformableItem(
                 fontFamily = FontFamily.Cursive,
                 fontWeight = FontWeight.Bold,
                 fontSize = 26.sp,
+            )
+            BoardItemType.IMAGE -> AsyncImage(
+                model = container.media.file(item.text.orEmpty()),
+                contentDescription = null,
+                modifier = Modifier
+                    .width(widthDp)
+                    .height(widthDp * aspect)
+                    .then(outline),
             )
             BoardItemType.DRAWING -> Unit
         }
@@ -579,24 +717,6 @@ private fun DrawScope.drawPattern(pattern: Int) {
             }
         }
     }
-}
-
-private fun saveToGallery(context: Context, bitmap: Bitmap, name: String): String {
-    val fileName = "自然收集-${name}-${System.currentTimeMillis()}.png"
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/自然收集")
-        }
-        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            ?: error("无法写入相册")
-        context.contentResolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        return "相册的「自然收集」文件夹"
-    }
-    val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "boards").apply { mkdirs() }
-    File(dir, fileName).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    return dir.path
 }
 
 @Composable

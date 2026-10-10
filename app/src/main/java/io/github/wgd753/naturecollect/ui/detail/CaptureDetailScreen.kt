@@ -53,6 +53,7 @@ import io.github.wgd753.naturecollect.ui.Tag
 import io.github.wgd753.naturecollect.ui.formatDate
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.theme.Card
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -211,7 +212,7 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
 private fun RecognitionLine(capture: CaptureEntity, onRetry: () -> Unit) {
     val category = Category.fromKey(capture.category)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Tag("${category.emoji} ${category.label}")
+        Tag("${category.emoji} ${category.label}", color = category.tint.copy(alpha = 0.22f))
         when (capture.status) {
             RecognitionStatus.DONE -> capture.confidence?.let { Tag("把握 ${(it * 100).toInt()}%") }
             RecognitionStatus.MANUAL -> Tag("手动命名")

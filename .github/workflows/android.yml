@@ -19,12 +19,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      # Reuse one signing key across runs so new APKs update the installed app.
+      - name: Restore signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: signing-key-v1
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: nature-collect-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: nature-collect-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

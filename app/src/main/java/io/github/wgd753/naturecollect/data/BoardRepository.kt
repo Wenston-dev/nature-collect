@@ -40,6 +40,17 @@ class BoardRepository(private val dao: BoardDao) {
     suspend fun addText(boardId: String, text: String, color: Long): BoardItemEntity =
         add(boardId, BoardItemType.TEXT, text = text, color = color, x = 0.5f, y = 0.5f)
 
+    suspend fun addImage(boardId: String, fileName: String, width: Int, height: Int): BoardItemEntity =
+        add(
+            boardId,
+            BoardItemType.IMAGE,
+            text = fileName,
+            pathData = "$width,$height",
+            x = 0.5f,
+            y = 0.5f,
+            rotation = (Math.random() * 10 - 5).toFloat(),
+        )
+
     suspend fun addDrawing(boardId: String, pathData: String, color: Long): BoardItemEntity =
         add(boardId, BoardItemType.DRAWING, pathData = pathData, color = color, x = 0f, y = 0f)
 

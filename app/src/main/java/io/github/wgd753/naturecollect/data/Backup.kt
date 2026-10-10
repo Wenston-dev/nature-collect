@@ -40,14 +40,14 @@ class Backup(
             zip.putNextEntry(ZipEntry(DATA_ENTRY))
             zip.write(json.toString().toByteArray())
             zip.closeEntry()
-            for (capture in captures) {
-                for (name in listOf(capture.photoFile, capture.stickerFile)) {
-                    val file = media.file(name)
-                    if (!file.exists()) continue
-                    zip.putNextEntry(ZipEntry("$MEDIA_PREFIX$name"))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
-                }
+            val names = captures.flatMap { listOf(it.photoFile, it.stickerFile) } +
+                items.filter { it.type == BoardItemType.IMAGE }.mapNotNull { it.text }
+            for (name in names) {
+                val file = media.file(name)
+                if (!file.exists()) continue
+                zip.putNextEntry(ZipEntry("$MEDIA_PREFIX$name"))
+                file.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
             }
         }
         captures.size

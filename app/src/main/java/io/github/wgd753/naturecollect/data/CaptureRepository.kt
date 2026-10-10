@@ -128,4 +128,8 @@ class CaptureRepository(
         media.delete(capture.photoFile)
         media.delete(capture.stickerFile)
     }
+
+    suspend fun deleteAll(ids: Collection<String>) {
+        ids.forEach { delete(it) }
+    }
 }

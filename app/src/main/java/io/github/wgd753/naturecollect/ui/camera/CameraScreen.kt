@@ -118,6 +118,9 @@ fun CameraScreen(onOpenCapture: (String) -> Unit) {
     val vm: CameraViewModel = viewModel { CameraViewModel(container) }
     val stage by vm.stage.collectAsState()
 
+    // Load the cut-out model only once the camera is actually opened, so app start stays light.
+    LaunchedEffect(Unit) { runCatching { container.segmenter.warmUp() } }
+
     // Back steps out of the current photo instead of leaving the camera.
     BackHandler(enabled = stage != CameraStage.Live) { vm.reset() }
     // Coming back to the camera later should show the viewfinder, not an old result card.
@@ -453,7 +456,7 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
                     alpha = fade.value
                     cameraDistance = 12f * density.density
                 }
-                .holographic(intensity = if (lift.value > 1f) 0.6f else 0.38f)
+                .holographic(intensity = 0.45f, trigger = lift.value > 1f)
                 .pointerInputPeel(
                     enabled = !flying,
                     onStart = { scope.launch { lift.animateTo(1.08f, spring(stiffness = Spring.StiffnessMedium)) } },
