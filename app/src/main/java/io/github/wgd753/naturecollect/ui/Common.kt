@@ -1,5 +1,6 @@
 package io.github.wgd753.naturecollect.ui
 
+import androidx.compose.animation.core.animateFloat
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
