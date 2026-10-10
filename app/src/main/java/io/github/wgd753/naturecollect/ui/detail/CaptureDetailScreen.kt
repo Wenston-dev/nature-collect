@@ -24,7 +24,24 @@ import androidx.compose.material.icons.outlined.AutoAwesomeMosaic
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import io.github.wgd753.naturecollect.data.speciesKey
+import io.github.wgd753.naturecollect.recognition.RecognitionException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +78,12 @@ import kotlin.random.Random
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -> Unit) {
+fun CaptureDetailScreen(
+    captureId: String,
+    onBack: () -> Unit,
+    onOpenBoard: () -> Unit,
+    onOpenCapture: (String) -> Unit,
+) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
     val capture by remember(captureId) { container.captures.observe(captureId) }.collectAsState(initial = null)
@@ -69,8 +91,13 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
     var editingName by remember { mutableStateOf(false) }
     var editingNotes by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val all by container.captures.observeAll().collectAsState(initial = emptyList())
 
     val c = capture
+    // Every encounter of the same species, newest first, so this page doubles as the species page.
+    val siblings = remember(all, c?.nameZh, c?.id) {
+        c?.let { current -> all.filter { speciesKey(it) == speciesKey(current) }.sortedByDescending { it.createdAt } }.orEmpty()
+    }
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(8.dp),
@@ -141,7 +168,13 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
                     Icon(Icons.Outlined.Edit, contentDescription = "改名字", tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            c.nameSci?.let { Text(it, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(
+                c.nameSci ?: "还没有英文名 / 学名，点 ✎ 补充",
+                modifier = Modifier.clickable { editingName = true },
+                fontStyle = if (c.nameSci != null) FontStyle.Italic else FontStyle.Normal,
+                style = if (c.nameSci != null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(8.dp))
             RecognitionLine(c) { scope.launch { container.recognition.retry(c.id) } }
             c.description?.let {
@@ -158,10 +191,17 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     alternatives.forEach { name ->
                         FilterPill(name, selected = false) {
-                            scope.launch { container.captures.rename(c.id, name, Category.fromKey(c.category)) }
+                            scope.launch {
+                                container.captures.rename(c.id, name, Category.fromKey(c.category), nameSci = null)
+                                container.recognition.fillDetails(c.id)
+                            }
                         }
                     }
                 }
+            }
+            if (siblings.size > 1) {
+                Spacer(Modifier.height(16.dp))
+                Encounters(siblings, currentId = c.id, onOpen = { if (it != c.id) onOpenCapture(it) })
             }
             Spacer(Modifier.height(16.dp))
             InfoCard(
@@ -178,9 +218,9 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
     }
 
     if (editingName && c != null) {
-        RenameDialog(c, onDismiss = { editingName = false }) { name, category ->
+        RenameDialog(c, onDismiss = { editingName = false }) { name, sci, category, description ->
             editingName = false
-            scope.launch { container.captures.rename(c.id, name, category) }
+            scope.launch { container.captures.rename(c.id, name, category, sci, description) }
         }
     }
     if (editingNotes && c != null) {
@@ -192,8 +232,16 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
     if (confirmDelete && c != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("删除这次收集？") },
-            text = { Text("贴纸和原图都会删除，贴纸板上的这张也会一起移除。") },
+            title = { Text(if (siblings.size > 1) "删除「${c.displayName}」？" else "删除这次收集？") },
+            text = {
+                Text(
+                    if (siblings.size > 1) {
+                        "图鉴里它一共有 ${siblings.size} 次遇见。可以只删这一次，也可以全部删除。贴纸、原图和贴纸板上的贴纸会一起移除。"
+                    } else {
+                        "贴纸和原图都会删除，贴纸板上的这张也会一起移除。"
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -201,9 +249,23 @@ fun CaptureDetailScreen(captureId: String, onBack: () -> Unit, onOpenBoard: () -
                         container.captures.delete(c.id)
                         onBack()
                     }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(if (siblings.size > 1) "只删这一次" else "删除", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            dismissButton = {
+                Row {
+                    if (siblings.size > 1) {
+                        TextButton(onClick = {
+                            confirmDelete = false
+                            val ids = siblings.map { it.id }
+                            scope.launch {
+                                container.captures.deleteAll(ids)
+                                onBack()
+                            }
+                        }) { Text("全部 ${siblings.size} 次", color = MaterialTheme.colorScheme.error) }
+                    }
+                    TextButton(onClick = { confirmDelete = false }) { Text("取消") }
+                }
+            },
         )
     }
 }
@@ -250,26 +312,171 @@ private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
     }
 }
 
+@Composable
+private fun Encounters(siblings: List<CaptureEntity>, currentId: String, onOpen: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "每一次遇见 · ${siblings.size} 次",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        LazyRow(
+            contentPadding = PaddingValues(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(siblings, key = { it.id }) { item ->
+                val current = item.id == currentId
+                Column(
+                    Modifier
+                        .width(84.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (current) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Card)
+                        .border(if (current) 2.dp else 0.dp, if (current) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(16.dp))
+                        .clickable { onOpen(item.id) }
+                        .padding(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    StickerImage(item, Modifier.size(64.dp))
+                    Text(
+                        java.text.SimpleDateFormat("M月d日", java.util.Locale.CHINA).format(java.util.Date(item.createdAt)),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class NameField { ZH, SCI }
+
+/**
+ * Edit both names together. Typing in one field translates it into the other
+ * after a short pause (unless the other was typed by hand), and also fills in
+ * the category and blurb; "立即翻译" forces it.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RenameDialog(capture: CaptureEntity, onDismiss: () -> Unit, onSave: (String, Category) -> Unit) {
-    var name by remember { mutableStateOf(capture.nameZh.orEmpty()) }
+private fun RenameDialog(
+    capture: CaptureEntity,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Category, String?) -> Unit,
+) {
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var zh by remember { mutableStateOf(capture.nameZh.orEmpty()) }
+    var sci by remember { mutableStateOf(capture.nameSci.orEmpty()) }
     var category by remember { mutableStateOf(Category.fromKey(capture.category)) }
+    var description by remember { mutableStateOf<String?>(null) }
+    var autoTranslate by rememberSaveable { mutableStateOf(true) }
+    var lastEdited by remember { mutableStateOf<NameField?>(null) }
+    var typedByHand by remember { mutableStateOf(emptySet<NameField>()) }
+    var categoryTouched by remember { mutableStateOf(false) }
+    var translating by remember { mutableStateOf<NameField?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var manualJob by remember { mutableStateOf<Job?>(null) }
+
+    suspend fun translate(from: NameField, force: Boolean) {
+        val query = if (from == NameField.ZH) zh else sci
+        if (query.isBlank()) return
+        val target = if (from == NameField.ZH) NameField.SCI else NameField.ZH
+        translating = target
+        status = "正在翻译…"
+        try {
+            val result = container.recognition.lookupName(query)
+            val keepTarget = !force && target in typedByHand && (if (target == NameField.ZH) zh else sci).isNotBlank()
+            if (!keepTarget) {
+                if (target == NameField.SCI) sci = result.nameSci.orEmpty() else zh = result.nameZh
+                typedByHand = typedByHand - target
+            }
+            if (!categoryTouched) category = result.category
+            description = result.description
+            status = when {
+                keepTarget -> "另一个名字是你手填的，没有覆盖；点「立即翻译」可以替换"
+                target == NameField.SCI && result.nameSci == null -> "没找到对应的英文名 / 学名"
+                else -> "已自动翻译，可以再改"
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: RecognitionException) {
+            status = e.message
+        } catch (e: Exception) {
+            status = "翻译失败，可以手动填写"
+        } finally {
+            translating = null
+        }
+    }
+
+    // Auto-translate once typing pauses; a new keystroke cancels the pending one.
+    // Keyed on the edited field only, so filling in the other field doesn't re-trigger it.
+    val source = lastEdited
+    val query = when (source) {
+        NameField.ZH -> zh
+        NameField.SCI -> sci
+        null -> ""
+    }
+    LaunchedEffect(query, source, autoTranslate) {
+        if (!autoTranslate || source == null) return@LaunchedEffect
+        delay(900)
+        translate(source, force = false)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("它叫什么？") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("中文名") }, singleLine = true)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = zh,
+                    onValueChange = {
+                        zh = it
+                        lastEdited = NameField.ZH
+                        typedByHand = typedByHand + NameField.ZH
+                    },
+                    label = { Text("中文名") },
+                    singleLine = true,
+                    trailingIcon = { if (translating == NameField.ZH) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
+                )
+                OutlinedTextField(
+                    value = sci,
+                    onValueChange = {
+                        sci = it
+                        lastEdited = NameField.SCI
+                        typedByHand = typedByHand + NameField.SCI
+                    },
+                    label = { Text("英文名 / 学名") },
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontStyle = FontStyle.Italic),
+                    trailingIcon = { if (translating == NameField.SCI) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = autoTranslate, onCheckedChange = { autoTranslate = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("编辑后自动翻译", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    TextButton(
+                        enabled = translating == null && (zh.isNotBlank() || sci.isNotBlank()),
+                        onClick = {
+                            val from = lastEdited ?: if (zh.isNotBlank()) NameField.ZH else NameField.SCI
+                            manualJob?.cancel()
+                            manualJob = scope.launch { translate(from, force = true) }
+                        },
+                    ) { Text("立即翻译") }
+                }
+                status?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Category.entries.forEach { option ->
-                        FilterPill("${option.emoji} ${option.label}", selected = option == category) { category = option }
+                        FilterPill("${option.emoji} ${option.label}", selected = option == category, tint = option.tint) {
+                            category = option
+                            categoryTouched = true
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, category) }, enabled = name.isNotBlank()) { Text("保存") }
+            TextButton(onClick = { onSave(zh, sci, category, description) }, enabled = zh.isNotBlank()) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )

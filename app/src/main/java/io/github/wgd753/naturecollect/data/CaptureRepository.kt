@@ -98,12 +98,20 @@ class CaptureRepository(
         captureDao.upsert(capture.copy(updatedAt = System.currentTimeMillis()))
     }
 
-    /** User-entered name; marks the capture as manually identified. */
-    suspend fun rename(id: String, nameZh: String, category: Category) {
+    /** User-entered names; marks the capture as manually identified. */
+    suspend fun rename(
+        id: String,
+        nameZh: String,
+        category: Category,
+        nameSci: String?,
+        description: String? = null,
+    ) {
         val capture = captureDao.get(id) ?: return
         update(
             capture.copy(
                 nameZh = nameZh.trim(),
+                nameSci = nameSci?.trim()?.ifEmpty { null },
+                description = description ?: capture.description.takeIf { capture.nameZh == nameZh.trim() },
                 category = category.name,
                 status = RecognitionStatus.MANUAL,
                 errorMessage = null,

@@ -75,13 +75,34 @@ class DeepSeekRecognizer(
                     ),
             )
 
+        parse(chat(apiKey, body))
+    }
+
+    /**
+     * Looks up a name the user typed, in Chinese, English or Latin, and returns
+     * the matching Chinese name, scientific name, category and a short blurb.
+     */
+    suspend fun lookup(apiKey: String, query: String): RecognitionResult = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+            .put("model", MODEL)
+            .put("thinking", JSONObject().put("type", "disabled"))
+            .put("temperature", 0.1)
+            .put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", LOOKUP_PROMPT))
+                    .put(JSONObject().put("role", "user").put("content", query.trim())),
+            )
+        parse(chat(apiKey, body))
+    }
+
+    private fun chat(apiKey: String, body: JSONObject): String {
         val request = Request.Builder()
             .url(ENDPOINT)
             .header("Authorization", "Bearer $apiKey")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
-
-        val text = try {
+        return try {
             client.newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
                 when {
@@ -97,7 +118,6 @@ class DeepSeekRecognizer(
         } catch (e: IOException) {
             throw RecognitionException("网络连接失败", retryable = true)
         }
-        parse(text)
     }
 
     companion object {
@@ -110,6 +130,13 @@ class DeepSeekRecognizer(
             {"name_zh":"中文常用名","name_sci":"学名（拉丁文，不确定就填 null）","category":"BIRD|FLOWER|PLANT|INSECT|ANIMAL|OTHER 之一","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":["其他可能的中文名，最多3个"]}
             分类规则：鸟类用 BIRD；以花为主体的用 FLOWER；树木、草、叶子、蘑菇等用 PLANT；昆虫、蜘蛛等用 INSECT；其他动物（含猫狗）用 ANIMAL；不是生物用 OTHER。
             尽量具体到种；只能确定到属或科时，name_zh 写到能确定的那一级，并降低 confidence。
+        """.trimIndent()
+
+        private val LOOKUP_PROMPT = """
+            你是一位熟悉中国动植物的博物学家。用户会给出一个物种或物体的名字，可能是中文名、英文名或拉丁学名。
+            请把它对应到同一个物种，只输出一个 JSON 对象，不要输出其他文字：
+            {"name_zh":"中文常用名","name_sci":"拉丁学名；不是生物或没有学名时填英文名","category":"BIRD|FLOWER|PLANT|INSECT|ANIMAL|OTHER 之一","confidence":0到1之间的数字,"description":"一句有趣的简介，不超过40字","alternatives":[]}
+            用户给的是中文名时，name_zh 原样保留；给的是英文或学名时，翻译成最常用的中文名。
         """.trimIndent()
 
         /** Pulls the JSON object out of the reply, tolerating code fences or stray text. */

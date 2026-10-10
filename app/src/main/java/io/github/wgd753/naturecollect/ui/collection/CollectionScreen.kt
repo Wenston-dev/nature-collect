@@ -89,7 +89,7 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Composable
-fun CollectionScreen(onOpenSpecies: (String) -> Unit, onOpenSettings: () -> Unit) {
+fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -202,7 +202,7 @@ fun CollectionScreen(onOpenSpecies: (String) -> Unit, onOpenSettings: () -> Unit
                         if (selecting) {
                             selected = if (isSelected) selected - group.key else selected + group.key
                         } else {
-                            onOpenSpecies(group.key)
+                            onOpenCapture(group.cover.id)
                         }
                     },
                     onLongClick = { selected = selected + group.key },
@@ -357,7 +357,7 @@ private fun SpeciesCell(
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = selecting,
                 modifier = Modifier.align(Alignment.TopStart),
                 enter = scaleIn() + fadeIn(),

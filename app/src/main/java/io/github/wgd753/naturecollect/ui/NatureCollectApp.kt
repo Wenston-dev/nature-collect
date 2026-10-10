@@ -1,6 +1,5 @@
 package io.github.wgd753.naturecollect.ui
 
-import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -40,7 +39,6 @@ import io.github.wgd753.naturecollect.ui.calendar.CalendarScreen
 import io.github.wgd753.naturecollect.ui.camera.CameraScreen
 import io.github.wgd753.naturecollect.ui.collection.CollectionScreen
 import io.github.wgd753.naturecollect.ui.detail.CaptureDetailScreen
-import io.github.wgd753.naturecollect.ui.detail.SpeciesDetailScreen
 import io.github.wgd753.naturecollect.ui.globe.GlobeScreen
 import io.github.wgd753.naturecollect.ui.settings.SettingsScreen
 import io.github.wgd753.naturecollect.ui.theme.Card
@@ -118,15 +116,8 @@ fun NatureCollectApp() {
             composable(Tab.Globe.route) { GlobeScreen(onOpenCapture = openCapture) }
             composable(Tab.Collection.route) {
                 CollectionScreen(
-                    onOpenSpecies = { key -> navController.navigate("species/" + Uri.encode(key)) },
-                    onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
-                )
-            }
-            composable("species/{key}", enterTransition = slideIn, popExitTransition = slideOut) { entry ->
-                SpeciesDetailScreen(
-                    speciesKey = entry.arguments?.getString("key").orEmpty(),
-                    onBack = { navController.popBackStack() },
                     onOpenCapture = openCapture,
+                    onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
                 )
             }
             composable("capture/{id}", enterTransition = slideIn, popExitTransition = slideOut) { entry ->
@@ -134,6 +125,10 @@ fun NatureCollectApp() {
                     captureId = entry.arguments?.getString("id").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenBoard = { selectTab(Tab.Board) },
+                    // Switching between encounters replaces this page instead of stacking up.
+                    onOpenCapture = { id ->
+                        navController.navigate("capture/$id") { popUpTo("capture/{id}") { inclusive = true } }
+                    },
                 )
             }
             composable(SETTINGS_ROUTE, enterTransition = slideIn, popExitTransition = slideOut) { SettingsScreen(onBack = { navController.popBackStack() }) }

@@ -130,6 +130,33 @@ class RecognitionService(
         return retry
     }
 
+    /** Translates a typed name (Chinese, English or Latin) into the full set of names. */
+    suspend fun lookupName(query: String): RecognitionResult {
+        val apiKey = settings.apiKey.value
+        if (apiKey.isNullOrBlank()) throw RecognitionException("设置 DeepSeek API Key 后可以自动翻译", retryable = false)
+        return recognizer.lookup(apiKey, query)
+    }
+
+    /** After the user picks another name, fills in its scientific name and blurb in the background. */
+    fun fillDetails(id: String) {
+        scope.launch {
+            runCatching {
+                val before = repository.get(id) ?: return@launch
+                val name = before.nameZh ?: return@launch
+                val result = lookupName(name)
+                val latest = repository.get(id) ?: return@launch
+                if (latest.nameZh != name) return@launch
+                repository.update(
+                    latest.copy(
+                        nameSci = result.nameSci,
+                        category = result.category.name,
+                        description = result.description ?: latest.description,
+                    ),
+                )
+            }
+        }
+    }
+
     /** Puts failed captures back in the queue (after the user fixes the key, for example). */
     suspend fun retry(id: String) {
         repository.markPending(id)
