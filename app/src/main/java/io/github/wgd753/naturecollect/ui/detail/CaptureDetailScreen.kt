@@ -43,6 +43,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.ui.platform.LocalContext
 import io.github.wgd753.naturecollect.export.Gallery
+import io.github.wgd753.naturecollect.export.ShareCard
+import androidx.compose.material.icons.outlined.Share
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.AlertDialog
@@ -145,6 +147,21 @@ fun CaptureDetailScreen(
     val siblings = remember(all, c?.nameZh, c?.id) {
         c?.let { current -> all.filter { speciesKey(it) == speciesKey(current) }.sortedByDescending { it.createdAt } }.orEmpty()
     }
+    // This species' place in the collection, counted by when each species was first seen.
+    val speciesNumber = remember(all, c?.nameZh) {
+        val current = c
+        if (current?.nameZh.isNullOrBlank()) {
+            null
+        } else {
+            val order = all.filter { !it.nameZh.isNullOrBlank() }
+                .groupBy { speciesKey(it) }
+                .map { (key, list) -> key to list.minOf { it.createdAt } }
+                .sortedBy { it.second }
+                .map { it.first }
+            order.indexOf(speciesKey(current!!)).takeIf { it >= 0 }?.plus(1)
+        }
+    }
+    var sharing by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -193,6 +210,26 @@ fun CaptureDetailScreen(
                         }
                     }) {
                         Icon(Icons.Outlined.AutoAwesomeMosaic, contentDescription = tr("贴到画板", "Add to board"), tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(
+                        enabled = !sharing,
+                        onClick = {
+                            sharing = true
+                            scope.launch {
+                                try {
+                                    ShareCard.share(context, container.media, c, speciesNumber)
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    snackbar.showSnackbar(tr("分享失败：${e.message}", "Couldn't share: ${e.message}"))
+                                } finally {
+                                    sharing = false
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = tr("分享", "Share"), tint = MaterialTheme.colorScheme.primary)
                     }
                     Box {
                         IconButton(onClick = { showMore = true }) {
@@ -309,7 +346,7 @@ fun CaptureDetailScreen(
             }
             if (siblings.size > 1) {
                 Spacer(Modifier.height(16.dp))
-                Encounters(siblings, currentId = c.id, onOpen = { if (it != c.id) onOpenCapture(it) })
+                Timeline(siblings, currentId = c.id, onOpen = { if (it != c.id) onOpenCapture(it) })
             }
             Spacer(Modifier.height(16.dp))
             InfoCard(
@@ -440,42 +477,6 @@ private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
                 Text(value, modifier = Modifier.weight(1f))
                 if (i == 0) {
                     Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Encounters(siblings: List<CaptureEntity>, currentId: String, onOpen: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            tr("每一次遇见 · ${siblings.size} 次", "Every find · ${siblings.size}"),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        LazyRow(
-            contentPadding = PaddingValues(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(siblings, key = { it.id }) { item ->
-                val current = item.id == currentId
-                Column(
-                    Modifier
-                        .width(84.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (current) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Card)
-                        .border(if (current) 2.dp else 0.dp, if (current) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(16.dp))
-                        .clickable { onOpen(item.id) }
-                        .padding(6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    StickerImage(item, Modifier.size(64.dp))
-                    Text(
-                        (if (Lang.english) java.text.SimpleDateFormat("MMM d", java.util.Locale.ENGLISH) else java.text.SimpleDateFormat("M月d日", java.util.Locale.CHINA)).format(java.util.Date(item.createdAt)),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }

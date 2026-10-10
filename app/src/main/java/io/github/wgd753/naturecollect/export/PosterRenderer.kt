@@ -143,7 +143,7 @@ class PosterRenderer(private val media: MediaFiles) {
             textAlign = Paint.Align.CENTER
         }
         val more = groups.size - shown.size
-        val foot = if (more > 0) tr("还有 $more 种没放下 · 自然收集", "$more more not shown") else tr("自然收集 · 我的野外笔记", "My field notes")
+        val foot = if (more > 0) tr("还有 $more 种没放下 · 拾野", "$more more not shown · Shiye") else tr("拾野 · 我的野外笔记", "Shiye · My field notes")
         canvas.drawText(foot, width / 2f, height - 64f, footPaint)
         return bitmap
     }

@@ -68,6 +68,35 @@ class Settings(context: Context) {
         }
     }
 
+    /** OpenAI-compatible base URL, e.g. https://api.deepseek.com or https://api.openai.com/v1. */
+    private val _baseUrl = MutableStateFlow(prefs.getString(KEY_BASE_URL, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_BASE_URL)
+    val baseUrl: StateFlow<String> = _baseUrl.asStateFlow()
+
+    fun setBaseUrl(value: String) {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty() || trimmed == DEFAULT_BASE_URL) {
+            prefs.edit().remove(KEY_BASE_URL).apply()
+            _baseUrl.value = DEFAULT_BASE_URL
+        } else {
+            prefs.edit().putString(KEY_BASE_URL, trimmed).apply()
+            _baseUrl.value = trimmed
+        }
+    }
+
+    private val _model = MutableStateFlow(prefs.getString(KEY_MODEL, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_MODEL)
+    val model: StateFlow<String> = _model.asStateFlow()
+
+    fun setModel(value: String) {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty() || trimmed == DEFAULT_MODEL) {
+            prefs.edit().remove(KEY_MODEL).apply()
+            _model.value = DEFAULT_MODEL
+        } else {
+            prefs.edit().putString(KEY_MODEL, trimmed).apply()
+            _model.value = trimmed
+        }
+    }
+
     fun setAutoRecognize(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO, enabled).apply()
         _autoRecognize.value = enabled
@@ -109,6 +138,10 @@ class Settings(context: Context) {
         const val MAP_OSM = "osm"
         const val LANG_ZH = "zh"
         const val LANG_EN = "en"
+        const val DEFAULT_BASE_URL = "https://api.deepseek.com"
+        const val DEFAULT_MODEL = "deepseek-flash"
+        private const val KEY_BASE_URL = "ai_base_url"
+        private const val KEY_MODEL = "ai_model"
         private const val KEY_LANG = "language"
         private const val KEYSTORE = "AndroidKeyStore"
         private const val ALIAS = "deepseek_api_key"

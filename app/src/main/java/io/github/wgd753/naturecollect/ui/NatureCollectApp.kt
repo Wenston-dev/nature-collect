@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.categories.CategoriesScreen
+import io.github.wgd753.naturecollect.ui.achievements.AchievementsScreen
 import io.github.wgd753.naturecollect.ui.onboarding.Onboarding
 import androidx.compose.runtime.collectAsState
 import io.github.wgd753.naturecollect.ui.theme.Forest
@@ -74,6 +75,7 @@ import io.github.wgd753.naturecollect.ui.settings.SettingsScreen
 
 private const val SETTINGS_ROUTE = "settings"
 private const val CATEGORIES_ROUTE = "categories"
+private const val ACHIEVEMENTS_ROUTE = "achievements"
 
 /** The five bottom tabs, in display order. */
 enum class Tab(val route: String, private val zh: String, private val en: String, val icon: ImageVector) {
@@ -146,6 +148,7 @@ fun NatureCollectApp() {
                     onOpenCapture = openCapture,
                     onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
                     onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) },
+                    onOpenAchievements = { navController.navigate(ACHIEVEMENTS_ROUTE) },
                 )
             }
             composable("capture/{id}", enterTransition = slideIn, popExitTransition = slideOut) { entry ->
@@ -167,6 +170,9 @@ fun NatureCollectApp() {
             }
             composable(CATEGORIES_ROUTE, enterTransition = slideIn, popExitTransition = slideOut) {
                 CategoriesScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ACHIEVEMENTS_ROUTE, enterTransition = slideIn, popExitTransition = slideOut) {
+                AchievementsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

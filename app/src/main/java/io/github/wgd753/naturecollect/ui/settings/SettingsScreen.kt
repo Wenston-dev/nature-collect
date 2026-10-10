@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -60,6 +62,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
     val savedKey by container.settings.apiKey.collectAsState()
     var key by remember(savedKey) { mutableStateOf(savedKey.orEmpty()) }
     var reveal by remember { mutableStateOf(false) }
+    val savedBaseUrl by container.settings.baseUrl.collectAsState()
+    val savedModel by container.settings.model.collectAsState()
+    var baseUrl by remember(savedBaseUrl) { mutableStateOf(if (savedBaseUrl == Settings.DEFAULT_BASE_URL) "" else savedBaseUrl) }
+    var model by remember(savedModel) { mutableStateOf(if (savedModel == Settings.DEFAULT_MODEL) "" else savedModel) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) {
@@ -95,7 +101,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Section(tr("物种识别（DeepSeek）", "Identification (DeepSeek)")) {
+            Section(tr("物种识别", "Identification")) {
                 Text(
                     tr(
                         "识别使用 DeepSeek V4.1 Flash。到 platform.deepseek.com 创建 API Key 后填在这里，Key 会加密保存在手机上。",
@@ -118,9 +124,47 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    label = { Text("Base URL") },
+                    placeholder = { Text(Settings.DEFAULT_BASE_URL) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text(tr("模型", "Model")) },
+                    placeholder = { Text(Settings.DEFAULT_MODEL) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                val customized = baseUrl.trim().let { it.isNotEmpty() && it != Settings.DEFAULT_BASE_URL } ||
+                    model.trim().let { it.isNotEmpty() && it != Settings.DEFAULT_MODEL }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tr("任意 OpenAI 兼容接口", "Any OpenAI-compatible API"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (customized) {
+                        TextButton(onClick = {
+                            baseUrl = ""
+                            model = ""
+                            container.settings.setBaseUrl("")
+                            container.settings.setModel("")
+                        }) { Text(tr("恢复默认", "Reset")) }
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = {
                         container.settings.setApiKey(key)
+                        container.settings.setBaseUrl(baseUrl)
+                        container.settings.setModel(model)
                         scope.launch {
                             // Anything that was waiting for a key gets another go.
                             container.captures.unrecognized().forEach { container.captures.markPending(it.id) }
@@ -177,7 +221,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = {
                         val stamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-                        exportLauncher.launch(tr("自然收集备份-$stamp.zip", "NatureCollect-backup-$stamp.zip"))
+                        exportLauncher.launch(tr("拾野备份-$stamp.zip", "Shiye-backup-$stamp.zip"))
                     }) { Text(tr("导出备份", "Export")) }
                     OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
                         Text(tr("导入备份", "Import"))

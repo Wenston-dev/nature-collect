@@ -88,7 +88,7 @@ class RecognitionService(
         var retry = false
         for (capture in repository.unrecognized()) {
             if (apiKey.isNullOrBlank()) {
-                repository.update(capture.copy(status = RecognitionStatus.PENDING, errorMessage = tr("还没有设置 DeepSeek API Key", "No DeepSeek API key set")))
+                repository.update(capture.copy(status = RecognitionStatus.PENDING, errorMessage = tr("还没有设置 API Key", "No API key set")))
                 continue
             }
             if (capture.status == RecognitionStatus.FAILED) continue
@@ -98,6 +98,8 @@ class RecognitionService(
                     ?: error(tr("贴纸文件丢失", "Sticker file missing"))
                 val result = recognizer.recognize(
                     apiKey = apiKey,
+                    baseUrl = settings.baseUrl.value,
+                    model = settings.model.value,
                     image = StickerMaker.onWhite(sticker),
                     latitude = capture.latitude,
                     longitude = capture.longitude,
@@ -134,8 +136,8 @@ class RecognitionService(
     /** Translates a typed name (Chinese, English or Latin) into the full set of names. */
     suspend fun lookupName(query: String): RecognitionResult {
         val apiKey = settings.apiKey.value
-        if (apiKey.isNullOrBlank()) throw RecognitionException(tr("设置 DeepSeek API Key 后可以自动翻译", "Set a DeepSeek API key to look up names"), retryable = false)
-        return recognizer.lookup(apiKey, query)
+        if (apiKey.isNullOrBlank()) throw RecognitionException(tr("设置 API Key 后可以自动翻译", "Set an API key to look up names"), retryable = false)
+        return recognizer.lookup(apiKey, settings.baseUrl.value, settings.model.value, query)
     }
 
     /** After the user picks another name, fills in its scientific name and blurb in the background. */

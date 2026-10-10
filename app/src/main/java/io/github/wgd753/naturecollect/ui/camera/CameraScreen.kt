@@ -759,6 +759,8 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
 @Composable
 private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (String) -> Unit) {
     val capture by remember(captureId) { vm.observeCapture(captureId) }.collectAsState(initial = null)
+    val captureRepo = rememberContainer().captures
+    val allCaptures by remember(captureRepo) { captureRepo.observeAll() }.collectAsState(initial = null)
     val enter = remember { Animatable(0f) }
     LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
 
@@ -819,6 +821,20 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                     c.description?.let {
                         Spacer(Modifier.height(8.dp))
                         Text(it, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    // A new species that crosses a category milestone gets one quiet line.
+                    val unlock = remember(allCaptures, c) {
+                        allCaptures?.let { io.github.wgd753.naturecollect.ui.achievements.tierUnlockedBy(it, c) }
+                    }
+                    unlock?.let { u ->
+                        val fade = remember(u) { Animatable(0f) }
+                        LaunchedEffect(u) { fade.animateTo(1f, tween(600)) }
+                        Text(
+                            "${u.category.emoji} ${u.category.display} · " + tr("解锁 ${u.tier} 种", "${u.tier} species"),
+                            modifier = Modifier.padding(top = 12.dp).alpha(fade.value),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
             }

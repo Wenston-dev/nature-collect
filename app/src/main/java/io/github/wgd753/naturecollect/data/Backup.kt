@@ -71,7 +71,7 @@ class Backup(
                 }
             }
         }
-        val data = json ?: error(tr("这不是自然收集的备份文件", "Not a valid backup file"))
+        val data = json ?: error(tr("这不是拾野的备份文件", "Not a valid backup file"))
         val captures = data.getJSONArray("captures").objects().map { it.toCapture() }
         captures.forEach { db.captureDao().upsert(it) }
         data.optJSONArray("categories")?.let { array ->

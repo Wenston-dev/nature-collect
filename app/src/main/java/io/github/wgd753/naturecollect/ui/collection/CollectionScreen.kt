@@ -100,13 +100,21 @@ import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.tr
+import io.github.wgd753.naturecollect.ui.achievements.achievementSummary
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Composable
-fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit, onOpenCategories: () -> Unit) {
+fun CollectionScreen(
+    onOpenCapture: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenCategories: () -> Unit,
+    onOpenAchievements: () -> Unit = {},
+) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -122,6 +130,7 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
     val groups = remember(all, categories) { all.groupBySpecies() }
     val shown = groups.filter { filter == null || it.category.key == filter?.key }
     val speciesCount = groups.count { it.cover.nameZh != null }
+    val achievements = remember(all, categories) { achievementSummary(all) }
     val selecting = selected.isNotEmpty()
     val monthStart = remember {
         Calendar.getInstance().apply {
@@ -197,7 +206,15 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
             modifier = Modifier.fillMaxSize(),
         ) {
             item(key = "hero", span = { GridItemSpan(maxLineSpan) }) {
-                HeroCard(groups = groups, speciesCount = speciesCount, total = all.size, newThisMonth = newThisMonth)
+                HeroCard(
+                    groups = groups,
+                    speciesCount = speciesCount,
+                    total = all.size,
+                    newThisMonth = newThisMonth,
+                    achievementsEarned = achievements.earned,
+                    achievementsTotal = achievements.total,
+                    onOpenAchievements = onOpenAchievements,
+                )
             }
             if (apiKey == null) {
                 item(key = "nokey", span = { GridItemSpan(maxLineSpan) }) {
@@ -302,7 +319,15 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
 
 /** Summary card: species count and encounters, with a quiet per-category tally. */
 @Composable
-private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, newThisMonth: Int) {
+private fun HeroCard(
+    groups: List<SpeciesGroup>,
+    speciesCount: Int,
+    total: Int,
+    newThisMonth: Int,
+    achievementsEarned: Int,
+    achievementsTotal: Int,
+    onOpenAchievements: () -> Unit,
+) {
     val counts = remember(groups) { groups.groupingBy { it.category.key }.eachCount() }
     val categories = Category.entries.filter { (counts[it.key] ?: 0) > 0 }
     Box(
@@ -359,6 +384,26 @@ private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, 
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpenAchievements)
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(tr("成就", "Achievements"), color = Forest, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(6.dp))
+            Text("$achievementsEarned/$achievementsTotal", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
     }
