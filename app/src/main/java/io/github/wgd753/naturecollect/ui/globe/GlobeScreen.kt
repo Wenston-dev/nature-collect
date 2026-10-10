@@ -1,5 +1,9 @@
 package io.github.wgd753.naturecollect.ui.globe
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import io.github.wgd753.naturecollect.ui.Mascot
+import io.github.wgd753.naturecollect.R
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
@@ -42,6 +46,7 @@ import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.FilterPill
 import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.location.ChinaCoords
@@ -199,9 +204,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("地图") {
+        PageHeader(tr("地图", "Map")) {
             Text(
-                "${located.map { "%.3f,%.3f".format(it.latitude, it.longitude) }.distinct().size} 个地点",
+                located.map { "%.3f,%.3f".format(it.latitude, it.longitude) }.distinct().size.let { tr("$it 个地点", if (it == 1) "1 place" else "$it places") },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -223,11 +228,11 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                     .clip(CircleShape)
                     .background(Card),
             ) {
-                Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "看全部", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Outlined.CenterFocusStrong, contentDescription = tr("看全部", "Show all"), tint = MaterialTheme.colorScheme.primary)
             }
             if (loadFailed) {
                 Text(
-                    if (amap) "地图加载失败，请检查网络" else "OpenStreetMap 在国内可能连不上，可以在设置里换回高德底图",
+                    if (amap) tr("地图加载失败，请检查网络", "Map failed to load. Check your connection.") else tr("OpenStreetMap 在国内可能连不上，可以在设置里换回高德底图", "OpenStreetMap may not load in mainland China. Switch to Amap in settings."),
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(24.dp)
@@ -238,16 +243,22 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 )
             }
             if (located.isEmpty()) {
-                Text(
-                    "带位置的收集会出现在这里\n拍照时允许定位就行",
+                Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Card)
-                        .padding(12.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Mascot(R.drawable.art_mascot_map, Modifier.size(64.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        tr("带位置的收集会出现在这里", "Finds with a location show up here"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

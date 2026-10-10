@@ -51,6 +51,7 @@ import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.ColorSwatchButton
 import io.github.wgd753.naturecollect.ui.tint
+import io.github.wgd753.naturecollect.ui.tr
 
 private val Palette = listOf(
     0xFF3D7DCA, 0xFF2BA3A8, 0xFF3E9B57, 0xFF8DB33A, 0xFFE5B21F,
@@ -77,10 +78,10 @@ fun CategoriesScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = MaterialTheme.colorScheme.primary)
             }
-            Text("分类管理", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-            TextButton(onClick = { confirmReset = true }) { Text("恢复默认") }
+            Text(tr("分类管理", "Categories"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            TextButton(onClick = { confirmReset = true }) { Text(tr("恢复默认", "Reset")) }
         }
         LazyColumn(
             Modifier.weight(1f),
@@ -104,19 +105,19 @@ fun CategoriesScreen(onBack: () -> Unit) {
                     ) { Text(category.emoji, fontSize = 22.sp) }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(category.label, fontWeight = FontWeight.Bold, color = category.tint)
+                        Text(category.display, fontWeight = FontWeight.Bold, color = category.tint)
                         Text(
-                            category.hint ?: "没有说明",
+                            category.hint ?: tr("没有说明", "No hint"),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
                     }
                     IconButton(onClick = { save(categories.move(index, index - 1)) }, enabled = index > 0) {
-                        Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "上移")
+                        Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = tr("上移", "Move up"))
                     }
                     IconButton(onClick = { save(categories.move(index, index + 1)) }, enabled = index < categories.lastIndex) {
-                        Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "下移")
+                        Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = tr("下移", "Move down"))
                     }
                 }
             }
@@ -133,7 +134,7 @@ fun CategoriesScreen(onBack: () -> Unit) {
                 ) {
                     Icon(Icons.Outlined.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(6.dp))
-                    Text("添加分类", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(tr("添加分类", "Add category"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -173,26 +174,26 @@ fun CategoriesScreen(onBack: () -> Unit) {
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("恢复默认分类？") },
-            text = { Text("你添加的分类会被移除，里面的收集会归到「其他」。") },
+            title = { Text(tr("恢复默认分类？", "Reset categories?")) },
+            text = { Text(tr("你添加的分类会被移除，里面的收集会归到「其他」。", "Categories you added will be removed. Their finds move to “Other”.")) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
                     container.categories.resetToDefaults()
-                }) { Text("恢复", color = MaterialTheme.colorScheme.error) }
+                }) { Text(tr("恢复", "Reset"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(tr("取消", "Cancel")) } },
         )
     }
 }
 
 /** Keeps the first [count] user-perceived characters, so a multi-codepoint emoji stays whole. */
 private fun firstGraphemes(text: String, count: Int): String {
-    val it = java.text.BreakIterator.getCharacterInstance()
-    it.setText(text)
+    val breaks = java.text.BreakIterator.getCharacterInstance()
+    breaks.setText(text)
     var end = 0
     repeat(count) {
-        val next = it.next()
+        val next = breaks.next()
         if (next == java.text.BreakIterator.DONE) return text
         end = next
     }
@@ -223,17 +224,17 @@ private fun CategoryDialog(
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("删除「${initial.label}」？") },
-            text = { Text("这个分类里的收集不会删除，会归到「其他」。") },
-            confirmButton = { TextButton(onClick = onDelete) { Text("删除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            title = { Text(tr("删除「${initial.display}」？", "Delete “${initial.display}”?")) },
+            text = { Text(tr("这个分类里的收集不会删除，会归到「其他」。", "Finds in this category won't be deleted. They move to “Other”.")) },
+            confirmButton = { TextButton(onClick = onDelete) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("取消", "Cancel")) } },
         )
         return
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNew) "添加分类" else "编辑分类") },
+        title = { Text(if (isNew) tr("添加分类", "Add category") else tr("编辑分类", "Edit category")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Any emoji works: type it with the keyboard's emoji panel, or pick a common one.
@@ -250,14 +251,14 @@ private fun CategoryDialog(
                     OutlinedTextField(
                         value = emoji,
                         onValueChange = { emoji = firstGraphemes(it, 2) },
-                        label = { Text("自定义 emoji") },
-                        placeholder = { Text("用表情键盘输入") },
+                        label = { Text(tr("自定义 emoji", "Custom emoji")) },
+                        placeholder = { Text(tr("用表情键盘输入", "Use the emoji keyboard")) },
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(fontSize = 22.sp),
                         modifier = Modifier.weight(1f).focusRequester(emojiFocus),
                     )
                 }
-                Text("常用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("常用", "Common"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     EmojiPicks.forEach { e ->
                         Text(
@@ -271,15 +272,15 @@ private fun CategoryDialog(
                         )
                     }
                 }
-                OutlinedTextField(value = label, onValueChange = { label = it.take(8) }, label = { Text("名称") }, singleLine = true)
+                OutlinedTextField(value = label, onValueChange = { label = it.take(8) }, label = { Text(tr("名称", "Name")) }, singleLine = true)
                 OutlinedTextField(
                     value = hint,
                     onValueChange = { hint = it.take(60) },
-                    label = { Text("识别提示（可选）") },
-                    placeholder = { Text("例如：各种石头和矿物") },
+                    label = { Text(tr("识别提示（可选）", "Recognition hint (optional)")) },
+                    placeholder = { Text(tr("例如：各种石头和矿物", "e.g. rocks and minerals")) },
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ColorSwatchButton(color, "分类颜色", onPick = { color = it }, size = 28.dp)
+                    ColorSwatchButton(color, tr("分类颜色", "Category color"), onPick = { color = it }, size = 28.dp)
                     Palette.forEach { c ->
                         Box(
                             Modifier
@@ -297,12 +298,12 @@ private fun CategoryDialog(
             TextButton(
                 enabled = label.isNotBlank(),
                 onClick = { onSave(initial.copy(label = label.trim(), emoji = emoji.trim().ifEmpty { "✨" }, hint = hint.trim().ifEmpty { null }, color = color)) },
-            ) { Text("保存") }
+            ) { Text(tr("保存", "Save")) }
         },
         dismissButton = {
             Row {
-                if (onDelete != null) TextButton(onClick = { confirmDelete = true }) { Text("删除", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = onDismiss) { Text("取消") }
+                if (onDelete != null) TextButton(onClick = { confirmDelete = true }) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) }
             }
         },
     )

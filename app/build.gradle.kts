@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.wgd753.naturecollect"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
         ndk {
             // Phones from the last several years are all 64-bit ARM; dropping the
@@ -23,10 +23,17 @@ android {
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // CI creates one debug-style key (standard debug passwords) and caches
+            // it, so each new APK installs over the previous one.
+            System.getenv("SIGNING_KEYSTORE")?.let { storeFile = file(it) }
+        }
+    }
+
     buildTypes {
         release {
-            // Signed with the debug key; CI keeps that key in its cache so each
-            // new APK installs over the previous one. Personal use, not for a store.
+            // Signed with the debug key. Personal use, not for a store.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true

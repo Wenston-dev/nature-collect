@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import io.github.wgd753.naturecollect.ui.tr
 
 sealed interface CameraStage {
     data object Live : CameraStage
@@ -68,7 +69,7 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
                     CameraStage.Selecting(image)
                 }
             } catch (e: Exception) {
-                _stage.value = CameraStage.Failed("抠图失败：${describe(e)}")
+                _stage.value = CameraStage.Failed(tr("抠图失败：${describe(e)}", "Cutout failed: ${describe(e)}"))
             }
         }
     }

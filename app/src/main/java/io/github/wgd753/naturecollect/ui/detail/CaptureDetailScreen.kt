@@ -83,6 +83,8 @@ import io.github.wgd753.naturecollect.ui.formatDate
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.tint
+import io.github.wgd753.naturecollect.ui.tr
+import io.github.wgd753.naturecollect.ui.Lang
 import io.github.wgd753.naturecollect.ui.theme.Card
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -115,7 +117,7 @@ fun CaptureDetailScreen(
         scope.launch {
             action()
             snackbar.currentSnackbarData?.dismiss()
-            val result = snackbar.showSnackbar("已改成「$newName」", actionLabel = "撤回", duration = SnackbarDuration.Long)
+            val result = snackbar.showSnackbar(tr("已改成「$newName」", "Renamed to “$newName”"), actionLabel = tr("撤回", "Undo"), duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) container.captures.update(previous)
         }
     }
@@ -124,10 +126,10 @@ fun CaptureDetailScreen(
         scope.launch {
             val message = runCatching {
                 withContext(Dispatchers.IO) {
-                    val bitmap = BitmapFactory.decodeFile(file.path) ?: error("文件不见了")
+                    val bitmap = BitmapFactory.decodeFile(file.path) ?: error(tr("文件不见了", "File not found"))
                     Gallery.save(context, bitmap, label, jpeg = file.name.endsWith(".jpg"))
                 }
-            }.fold({ "已保存到$it" }, { "保存失败：${it.message}" })
+            }.fold({ tr("已保存到$it", "Saved to $it") }, { tr("保存失败：${it.message}", "Couldn't save: ${it.message}") })
             snackbar.currentSnackbarData?.dismiss()
             snackbar.showSnackbar(message)
         }
@@ -146,27 +148,27 @@ fun CaptureDetailScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = MaterialTheme.colorScheme.primary)
             }
             if (c != null) {
                 Row {
                     Box {
                         IconButton(onClick = { showSaveMenu = true }) {
-                            Icon(Icons.Outlined.FileDownload, contentDescription = "保存到相册", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Outlined.FileDownload, contentDescription = tr("保存到相册", "Save to gallery"), tint = MaterialTheme.colorScheme.primary)
                         }
                         DropdownMenu(expanded = showSaveMenu, onDismissRequest = { showSaveMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("保存贴纸（透明背景）") },
+                                text = { Text(tr("保存贴纸（透明背景）", "Save sticker (transparent)")) },
                                 onClick = {
                                     showSaveMenu = false
-                                    saveImage(container.media.file(c.stickerFile), "${c.displayName}-贴纸")
+                                    saveImage(container.media.file(c.stickerFile), tr("${c.displayName}-贴纸", "${c.displayName}-sticker"))
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("保存原图") },
+                                text = { Text(tr("保存原图", "Save original photo")) },
                                 onClick = {
                                     showSaveMenu = false
-                                    saveImage(container.media.file(c.photoFile), "${c.displayName}-原图")
+                                    saveImage(container.media.file(c.photoFile), tr("${c.displayName}-原图", "${c.displayName}-photo"))
                                 },
                             )
                         }
@@ -185,10 +187,10 @@ fun CaptureDetailScreen(
                             onOpenBoard()
                         }
                     }) {
-                        Icon(Icons.Outlined.AutoAwesomeMosaic, contentDescription = "贴到画板", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.AutoAwesomeMosaic, contentDescription = tr("贴到画板", "Add to board"), tint = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = { confirmDelete = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Outlined.Delete, contentDescription = tr("删除", "Delete"), tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -222,11 +224,11 @@ fun CaptureDetailScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(c.displayName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                 IconButton(onClick = { editingName = true }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "改名字", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Outlined.Edit, contentDescription = tr("改名字", "Rename"), tint = MaterialTheme.colorScheme.primary)
                 }
             }
             Text(
-                c.nameSci ?: "还没有英文名 / 学名，点 ✎ 补充",
+                c.nameSci ?: tr("还没有英文名 / 学名，点 ✎ 补充", "No English name yet. Tap ✎ to add"),
                 modifier = Modifier.clickable { editingName = true },
                 fontStyle = if (c.nameSci != null) FontStyle.Italic else FontStyle.Normal,
                 style = if (c.nameSci != null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.labelMedium,
@@ -244,19 +246,19 @@ fun CaptureDetailScreen(
                     .padding(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("简介", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Icon(Icons.Outlined.Edit, contentDescription = "编辑简介", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    Text(tr("简介", "About"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑简介", "Edit description"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    c.description ?: "还没有简介，点这里写一句，或者让 AI 帮你写",
+                    c.description ?: tr("还没有简介，点这里写一句，或者让 AI 帮你写", "No description yet. Tap to write one, or let AI do it"),
                     color = if (c.description != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             val alternatives = c.alternatives?.split('|')?.filter { it.isNotBlank() }.orEmpty()
             if (alternatives.isNotEmpty() && c.status == RecognitionStatus.DONE) {
                 Spacer(Modifier.height(12.dp))
-                Text("也可能是：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("也可能是：", "Could also be:"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     alternatives.forEach { name ->
                         FilterPill(name, selected = false) {
@@ -275,10 +277,10 @@ fun CaptureDetailScreen(
             Spacer(Modifier.height(16.dp))
             InfoCard(
                 rows = listOf(
-                    "时间" to formatDate(c.createdAt),
-                    "地点" to (c.placeName ?: "未填写"),
-                    "坐标" to (c.latitude?.let { "%.5f, %.5f".format(it, c.longitude) } ?: "没有位置信息"),
-                    "笔记" to (c.note ?: "—"),
+                    tr("时间", "Time") to formatDate(c.createdAt),
+                    tr("地点", "Place") to (c.placeName ?: tr("未填写", "Not set")),
+                    tr("坐标", "Coordinates") to (c.latitude?.let { "%.5f, %.5f".format(it, c.longitude) } ?: tr("没有位置信息", "No location")),
+                    tr("笔记", "Notes") to (c.note ?: "—"),
                 ),
                 onEdit = { editingNotes = true },
             )
@@ -309,13 +311,13 @@ fun CaptureDetailScreen(
     if (confirmDelete && c != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text(if (siblings.size > 1) "删除「${c.displayName}」？" else "删除这次收集？") },
+            title = { Text(if (siblings.size > 1) tr("删除「${c.displayName}」？", "Delete “${c.displayName}”?") else tr("删除这次收集？", "Delete this find?")) },
             text = {
                 Text(
                     if (siblings.size > 1) {
-                        "图鉴里它一共有 ${siblings.size} 次遇见。可以只删这一次，也可以全部删除。贴纸、原图和贴纸板上的贴纸会一起移除。"
+                        tr("图鉴里它一共有 ${siblings.size} 次遇见。可以只删这一次，也可以全部删除。贴纸、原图和贴纸板上的贴纸会一起移除。", "You've found this ${siblings.size} times. Delete just this one, or all of them. Stickers, photos and board stickers will be removed too.")
                     } else {
-                        "贴纸和原图都会删除，贴纸板上的这张也会一起移除。"
+                        tr("贴纸和原图都会删除，贴纸板上的这张也会一起移除。", "The sticker and photo will be deleted, and removed from the board.")
                     },
                 )
             },
@@ -326,7 +328,7 @@ fun CaptureDetailScreen(
                         container.captures.delete(c.id)
                         onBack()
                     }
-                }) { Text(if (siblings.size > 1) "只删这一次" else "删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(if (siblings.size > 1) tr("只删这一次", "Just this one") else tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 Row {
@@ -338,9 +340,9 @@ fun CaptureDetailScreen(
                                 container.captures.deleteAll(ids)
                                 onBack()
                             }
-                        }) { Text("全部 ${siblings.size} 次", color = MaterialTheme.colorScheme.error) }
+                        }) { Text(tr("全部 ${siblings.size} 次", "All ${siblings.size}"), color = MaterialTheme.colorScheme.error) }
                     }
-                    TextButton(onClick = { confirmDelete = false }) { Text("取消") }
+                    TextButton(onClick = { confirmDelete = false }) { Text(tr("取消", "Cancel")) }
                 }
             },
         )
@@ -351,18 +353,18 @@ fun CaptureDetailScreen(
 private fun RecognitionLine(capture: CaptureEntity, onRetry: () -> Unit) {
     val category = Category.fromKey(capture.category)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Tag("${category.emoji} ${category.label}", color = category.tint.copy(alpha = 0.22f))
+        Tag("${category.emoji} ${category.display}", color = category.tint.copy(alpha = 0.22f))
         when (capture.status) {
-            RecognitionStatus.DONE -> capture.confidence?.let { Tag("把握 ${(it * 100).toInt()}%") }
-            RecognitionStatus.MANUAL -> Tag("手动命名")
-            RecognitionStatus.PENDING, RecognitionStatus.RUNNING -> Tag(capture.errorMessage ?: "等待识别")
-            RecognitionStatus.FAILED -> Tag(capture.errorMessage ?: "识别失败")
+            RecognitionStatus.DONE -> capture.confidence?.let { Tag(tr("把握 ${(it * 100).toInt()}%", "${(it * 100).toInt()}% sure")) }
+            RecognitionStatus.MANUAL -> Tag(tr("手动命名", "Named by hand"))
+            RecognitionStatus.PENDING, RecognitionStatus.RUNNING -> Tag(capture.errorMessage ?: tr("等待识别", "Waiting"))
+            RecognitionStatus.FAILED -> Tag(capture.errorMessage ?: tr("识别失败", "Not recognized"))
         }
         if (capture.status == RecognitionStatus.FAILED || capture.status == RecognitionStatus.DONE ||
             (capture.status == RecognitionStatus.PENDING && capture.errorMessage != null)
         ) {
             IconButton(onClick = onRetry) {
-                Icon(Icons.Outlined.Refresh, contentDescription = "重新识别", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Outlined.Refresh, contentDescription = tr("重新识别", "Recognize again"), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -384,7 +386,7 @@ private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
                 Text(label, modifier = Modifier.padding(end = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(value, modifier = Modifier.weight(1f))
                 if (i == 0) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -395,7 +397,7 @@ private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
 private fun Encounters(siblings: List<CaptureEntity>, currentId: String, onOpen: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "每一次遇见 · ${siblings.size} 次",
+            tr("每一次遇见 · ${siblings.size} 次", "Every find · ${siblings.size}"),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -417,7 +419,7 @@ private fun Encounters(siblings: List<CaptureEntity>, currentId: String, onOpen:
                 ) {
                     StickerImage(item, Modifier.size(64.dp))
                     Text(
-                        java.text.SimpleDateFormat("M月d日", java.util.Locale.CHINA).format(java.util.Date(item.createdAt)),
+                        (if (Lang.english) java.text.SimpleDateFormat("MMM d", java.util.Locale.ENGLISH) else java.text.SimpleDateFormat("M月d日", java.util.Locale.CHINA)).format(java.util.Date(item.createdAt)),
                         style = MaterialTheme.typography.labelMedium,
                         color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -460,7 +462,7 @@ private fun RenameDialog(
         if (query.isBlank()) return
         val target = if (from == NameField.ZH) NameField.SCI else NameField.ZH
         translating = target
-        status = "正在翻译…"
+        status = tr("正在翻译…", "Translating…")
         try {
             val result = container.recognition.lookupName(query)
             val keepTarget = !force && target in typedByHand && (if (target == NameField.ZH) zh else sci).isNotBlank()
@@ -471,16 +473,16 @@ private fun RenameDialog(
             if (!categoryTouched) category = result.category
             description = result.description
             status = when {
-                keepTarget -> "保留了你手填的名字"
-                target == NameField.SCI && result.nameSci == null -> "没找到英文名"
-                else -> "已翻译"
+                keepTarget -> tr("保留了你手填的名字", "Kept the name you typed")
+                target == NameField.SCI && result.nameSci == null -> tr("没找到英文名", "No English name found")
+                else -> tr("已翻译", "Translated")
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: RecognitionException) {
             status = e.message
         } catch (e: Exception) {
-            status = "翻译失败"
+            status = tr("翻译失败", "Translation failed")
         } finally {
             translating = null
         }
@@ -502,7 +504,7 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("它叫什么？") },
+        title = { Text(tr("它叫什么？", "What is it?")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -512,7 +514,7 @@ private fun RenameDialog(
                         lastEdited = NameField.ZH
                         typedByHand = typedByHand + NameField.ZH
                     },
-                    label = { Text("中文名") },
+                    label = { Text(tr("中文名", "Chinese name")) },
                     singleLine = true,
                     trailingIcon = { if (translating == NameField.ZH) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
                 )
@@ -523,7 +525,7 @@ private fun RenameDialog(
                         lastEdited = NameField.SCI
                         typedByHand = typedByHand + NameField.SCI
                     },
-                    label = { Text("英文名 / 学名") },
+                    label = { Text(tr("英文名 / 学名", "English name")) },
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(fontStyle = FontStyle.Italic),
                     trailingIcon = { if (translating == NameField.SCI) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
@@ -531,7 +533,7 @@ private fun RenameDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = autoTranslate, onCheckedChange = { autoTranslate = it })
                     Spacer(Modifier.width(8.dp))
-                    Text("编辑后自动翻译", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(tr("编辑后自动翻译", "Auto-translate"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     TextButton(
                         enabled = translating == null && (zh.isNotBlank() || sci.isNotBlank()),
                         onClick = {
@@ -539,14 +541,14 @@ private fun RenameDialog(
                             manualJob?.cancel()
                             manualJob = scope.launch { translate(from, force = true) }
                         },
-                    ) { Text("立即翻译") }
+                    ) { Text(tr("立即翻译", "Translate")) }
                 }
                 status?.let {
                     Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Category.entries.forEach { option ->
-                        FilterPill("${option.emoji} ${option.label}", selected = option == category, tint = option.tint) {
+                        FilterPill("${option.emoji} ${option.display}", selected = option == category, tint = option.tint) {
                             category = option
                             categoryTouched = true
                         }
@@ -555,9 +557,9 @@ private fun RenameDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(zh, sci, category, description) }, enabled = zh.isNotBlank()) { Text("保存") }
+            TextButton(onClick = { onSave(zh, sci, category, description) }, enabled = zh.isNotBlank()) { Text(tr("保存", "Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }
 
@@ -571,14 +573,14 @@ private fun DescriptionDialog(capture: CaptureEntity, onDismiss: () -> Unit, onS
     var status by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("简介") },
+        title = { Text(tr("简介", "About")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(200) },
                     minLines = 3,
-                    placeholder = { Text("写一句关于它的介绍") },
+                    placeholder = { Text(tr("写一句关于它的介绍", "A line about it")) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -590,24 +592,24 @@ private fun DescriptionDialog(capture: CaptureEntity, onDismiss: () -> Unit, onS
                             scope.launch {
                                 try {
                                     val result = container.recognition.lookupName(capture.nameZh.orEmpty())
-                                    result.description?.let { text = it } ?: run { status = "AI 没有写出来，再试一次" }
+                                    result.description?.let { text = it } ?: run { status = tr("AI 没有写出来，再试一次", "AI came up empty. Try again") }
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Exception) {
-                                    status = e.message ?: "生成失败"
+                                    status = e.message ?: tr("生成失败", "Couldn't generate")
                                 } finally {
                                     writing = false
                                 }
                             }
                         },
-                    ) { Text("✨ 让 AI 写一句") }
+                    ) { Text(tr("✨ 让 AI 写一句", "✨ Let AI write one")) }
                     if (writing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 status?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onSave(text) }) { Text(tr("保存", "Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }
 
@@ -617,14 +619,14 @@ private fun NotesDialog(capture: CaptureEntity, onDismiss: () -> Unit, onSave: (
     var note by remember { mutableStateOf(capture.note.orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("地点和笔记") },
+        title = { Text(tr("地点和笔记", "Place and notes")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = place, onValueChange = { place = it }, label = { Text("地点，例如 西湖公园") }, singleLine = true)
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("笔记") }, minLines = 3)
+                OutlinedTextField(value = place, onValueChange = { place = it }, label = { Text(tr("地点，例如 西湖公园", "Place, e.g. Central Park")) }, singleLine = true)
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(tr("笔记", "Notes")) }, minLines = 3)
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(place, note) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onSave(place, note) }) { Text(tr("保存", "Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }

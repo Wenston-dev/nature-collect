@@ -58,6 +58,7 @@ import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.theme.InkSoft
 import java.time.Instant
 import java.time.LocalDate
@@ -66,7 +67,11 @@ import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
-private val WeekdayLabels = listOf("日", "一", "二", "三", "四", "五", "六")
+private val WeekdayLabels: List<String>
+    get() = listOf(
+        tr("日", "Sun"), tr("一", "Mon"), tr("二", "Tue"), tr("三", "Wed"),
+        tr("四", "Thu"), tr("五", "Fri"), tr("六", "Sat"),
+    )
 
 /** Month grid where each day shows that day's latest sticker and a count. */
 @Composable
@@ -89,11 +94,11 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        PageHeader("日历") {
+        PageHeader(tr("日历", "Calendar")) {
             TextButton(onClick = {
                 monthOffset = 0
                 selectedEpochDay = today.toEpochDay()
-            }) { Text("今天") }
+            }) { Text(tr("今天", "Today")) }
         }
         DayCard(selected, byDay[selected].orEmpty(), onOpenCapture)
         CategoryFilterRow(selected = filter, onSelect = { filter = it }, modifier = Modifier.padding(top = 12.dp))
@@ -103,15 +108,18 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = { monthOffset-- }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "上个月", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = tr("上个月", "Previous month"), tint = MaterialTheme.colorScheme.primary)
             }
             Text(
-                text = "${month.year} 年 ${month.monthValue} 月",
+                text = tr(
+                    "${month.year} 年 ${month.monthValue} 月",
+                    "${month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${month.year}",
+                ),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             IconButton(onClick = { monthOffset++ }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = "下个月", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = tr("下个月", "Next month"), tint = MaterialTheme.colorScheme.primary)
             }
         }
         AnimatedContent(
@@ -203,7 +211,7 @@ private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture
             )
         } else {
             Text(
-                "这天还没有收集",
+                tr("这天还没有收集", "Nothing collected this day"),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

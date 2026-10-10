@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import io.github.wgd753.naturecollect.ui.Lang
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +34,19 @@ class Settings(context: Context) {
     fun setMapSource(value: String) {
         prefs.edit().putString(KEY_MAP, value).apply()
         _mapSource.value = value
+    }
+
+    private val _language = MutableStateFlow(prefs.getString(KEY_LANG, LANG_ZH) ?: LANG_ZH)
+    val language: StateFlow<String> = _language.asStateFlow()
+
+    init {
+        Lang.english = _language.value == LANG_EN
+    }
+
+    fun setLanguage(value: String) {
+        prefs.edit().putString(KEY_LANG, value).apply()
+        _language.value = value
+        Lang.english = value == LANG_EN
     }
 
     private val _onboarded = MutableStateFlow(prefs.getBoolean(KEY_ONBOARDED, false))
@@ -93,6 +107,9 @@ class Settings(context: Context) {
     companion object {
         const val MAP_AMAP = "amap"
         const val MAP_OSM = "osm"
+        const val LANG_ZH = "zh"
+        const val LANG_EN = "en"
+        private const val KEY_LANG = "language"
         private const val KEYSTORE = "AndroidKeyStore"
         private const val ALIAS = "deepseek_api_key"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"

@@ -32,6 +32,7 @@ import io.github.wgd753.naturecollect.ml.StickerMaker
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import kotlinx.coroutines.launch
+import io.github.wgd753.naturecollect.ui.tr
 
 /**
  * Full-screen picker for turning any photo into a sticker: the middle is cut
@@ -68,7 +69,7 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
             }
             if (state == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    if (error != null) Text("抠图失败：$error", color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
+                    if (error != null) Text(tr("抠图失败：$error", "Cutout failed: $error"), color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
                 }
             } else {
                 CutoutEditor(state)
@@ -77,9 +78,9 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
                 Modifier.padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                PillButton("取消", onClick = onDismiss)
-                PillButton("整张贴上") { onDone(StickerMaker.framed(photo)) }
-                PillButton("用抠出的", primary = true, enabled = state?.hasSelection == true) {
+                PillButton(tr("取消", "Cancel"), onClick = onDismiss)
+                PillButton(tr("整张贴上", "Use whole photo")) { onDone(StickerMaker.framed(photo)) }
+                PillButton(tr("用抠出的", "Use cutout"), primary = true, enabled = state?.hasSelection == true) {
                     scope.launch { state?.sticker()?.let(onDone) }
                 }
             }

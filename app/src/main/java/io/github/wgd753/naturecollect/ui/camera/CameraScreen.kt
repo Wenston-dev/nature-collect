@@ -1,6 +1,13 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.Manifest
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.runtime.withFrameNanos
 import android.provider.MediaStore
 import android.content.Intent
 import android.os.Build
@@ -128,6 +135,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.hypot
+import io.github.wgd753.naturecollect.ui.tr
 
 @Composable
 fun CameraScreen(onOpenCapture: (String) -> Unit) {
@@ -199,13 +207,13 @@ private fun LiveCamera(vm: CameraViewModel) {
                 val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
                 val (latLng, time) = withContext(Dispatchers.IO) { container.location.readExif(uri) }
                 if (bitmap == null) {
-                    vm.fail("这张图片打不开")
+                    vm.fail(tr("这张图片打不开", "Can't open this image"))
                 } else {
                     vm.onPhoto(bitmap, latLng, time, imported = true)
-                    val found = listOfNotNull(time?.let { "拍摄时间" }, latLng?.let { "地点" })
+                    val found = listOfNotNull(time?.let { tr("拍摄时间", "time") }, latLng?.let { tr("地点", "location") })
                     Toast.makeText(
                         context,
-                        if (found.isEmpty()) "这张照片里没有时间和位置信息" else "已从照片读取${found.joinToString("和")}",
+                        if (found.isEmpty()) tr("这张照片里没有时间和位置信息", "No time or location in this photo") else tr("已从照片读取${found.joinToString("和")}", "Read ${found.joinToString(" and ")} from photo"),
                         Toast.LENGTH_SHORT,
                     ).show()
                 }
@@ -266,7 +274,7 @@ private fun LiveCamera(vm: CameraViewModel) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(Sun))
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "对准它，让它待在框中间",
+                text = tr("对准它，让它待在框中间", "Keep it centered in the frame"),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White.copy(alpha = 0.9f),
             )
@@ -310,9 +318,9 @@ private fun LiveCamera(vm: CameraViewModel) {
                 )
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("需要相机权限才能拍照", color = Color.White.copy(alpha = 0.7f))
+                    Text(tr("需要相机权限才能拍照", "Camera access is needed"), color = Color.White.copy(alpha = 0.7f))
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }) { Text("允许使用相机") }
+                    Button(onClick = { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }) { Text(tr("允许使用相机", "Allow camera")) }
                 }
             }
             ViewfinderCorners(Modifier.fillMaxSize())
@@ -330,7 +338,7 @@ private fun LiveCamera(vm: CameraViewModel) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SideButton(Icons.Outlined.PhotoLibrary, "相册") {
+            SideButton(Icons.Outlined.PhotoLibrary, tr("相册", "Gallery")) {
                 picker.launch(
                     Intent(Intent.ACTION_PICK).setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*"),
                 )
@@ -351,12 +359,12 @@ private fun LiveCamera(vm: CameraViewModel) {
                         }
 
                         override fun onError(exception: ImageCaptureException) {
-                            vm.fail("拍照失败：${exception.message}")
+                            vm.fail(tr("拍照失败：${exception.message}", "Capture failed: ${exception.message}"))
                         }
                     },
                 )
             }
-            SideButton(Icons.Outlined.Cameraswitch, "翻转") {
+            SideButton(Icons.Outlined.Cameraswitch, tr("翻转", "Flip")) {
                 lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
                     CameraSelector.LENS_FACING_FRONT
                 } else {
@@ -440,35 +448,123 @@ private fun ViewfinderCorners(modifier: Modifier) {
     )
 }
 
-/** The photo with a light band sweeping over it while the encoder runs. */
+private class Sparkle(val x: Float, val y: Float, val radius: Float, val phase: Float, val speed: Float, val color: Color)
+
+private val AuroraColors = listOf(
+    Color(0xFF7FE0B5), Color(0xFF7CC8FF), Color(0xFFB59CFF), Color(0xFFF0775A), Color(0xFFF5B83D), Color(0xFF7FE0B5),
+)
+
+/**
+ * While SAM encodes the photo: an aurora scan line combs over it, lighting up a
+ * dot grid as it passes, stars twinkle and drift, and a rainbow rim flows
+ * around the frame. Everything runs off one frame clock.
+ */
 @Composable
 private fun FindingSubject(photo: Bitmap) {
-    val transition = rememberInfiniteTransition(label = "scan")
-    val sweep by transition.animateFloat(
-        initialValue = -0.3f,
-        targetValue = 1.3f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
-        label = "sweep",
-    )
-    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+    val sparkles = remember(photo) {
+        val rnd = kotlin.random.Random(photo.width * 31 + photo.height)
+        val palette = listOf(Color.White, Color(0xFFF5B83D), Color(0xFF7FE0B5), Color(0xFFB59CFF), Color(0xFFFFD6E0))
+        List(30) {
+            Sparkle(rnd.nextFloat(), rnd.nextFloat(), 4f + rnd.nextFloat() * 9f, rnd.nextFloat(), 0.35f + rnd.nextFloat() * 0.7f, palette[rnd.nextInt(palette.size)])
+        }
+    }
+    var time by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = withFrameNanos { it }
+        while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
+    }
+    val intro = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { intro.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
+
+    Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
-                .clip(RoundedCornerShape(28.dp))
+                .graphicsLayer {
+                    val s = 0.92f + 0.08f * intro.value
+                    scaleX = s
+                    scaleY = s
+                    alpha = intro.value
+                }
                 .drawWithContent {
                     drawContent()
-                    val y = sweep * size.height
-                    drawRect(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
-                            startY = y - 120f,
-                            endY = y + 120f,
-                        ),
-                    )
+                    // Flowing rainbow rim with a soft glow built from stacked strokes.
+                    val a = time * 1.4f
+                    val r = size.maxDimension
+                    val c = Offset(size.width / 2, size.height / 2)
+                    val dir = Offset(kotlin.math.cos(a), kotlin.math.sin(a)) * r
+                    val brush = Brush.linearGradient(AuroraColors, start = c - dir, end = c + dir)
+                    val corner = CornerRadius(28.dp.toPx())
+                    listOf(18f to 0.08f, 10f to 0.16f, 5f to 0.35f, 2.5f to 1f).forEach { (w, alpha) ->
+                        drawRoundRect(brush, cornerRadius = corner, style = Stroke(w.dp.toPx()), alpha = alpha * intro.value)
+                    }
                 },
         ) {
-            Image(photo.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit)
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(28.dp))
+                    .drawWithContent {
+                        drawContent()
+                        val t = time
+                        val w = size.width
+                        val h = size.height
+                        drawRect(Color(0xFF0B1A14).copy(alpha = 0.22f + 0.06f * kotlin.math.sin(t * 2f)))
+
+                        val p = kotlin.math.sin(t * 1.5f) * 0.5f + 0.5f
+                        val y = p * h
+                        val band = 46.dp.toPx()
+                        val hue = AuroraColors[((t * 0.6f).toInt()) % (AuroraColors.size - 1)]
+
+                        // Dot grid that lights up near the scan line.
+                        val step = 18.dp.toPx()
+                        var gy = step / 2
+                        while (gy < h) {
+                            val d = kotlin.math.abs(gy - y)
+                            if (d < band * 2.2f) {
+                                val k = 1f - d / (band * 2.2f)
+                                var gx = step / 2
+                                while (gx < w) {
+                                    drawCircle(Color.White, radius = 1.4.dp.toPx() * (0.6f + k), center = Offset(gx, gy), alpha = k * 0.75f)
+                                    gx += step
+                                }
+                            }
+                            gy += step
+                        }
+                        // Aurora haze and the bright line itself.
+                        drawRect(
+                            Brush.verticalGradient(listOf(Color.Transparent, hue.copy(alpha = 0.38f), Color.Transparent), startY = y - band * 2, endY = y + band * 2),
+                        )
+                        val lineBrush = Brush.horizontalGradient(AuroraColors)
+                        drawRect(lineBrush, topLeft = Offset(0f, y - 7.dp.toPx()), size = Size(w, 14.dp.toPx()), alpha = 0.25f)
+                        drawRect(lineBrush, topLeft = Offset(0f, y - 1.5.dp.toPx()), size = Size(w, 3.dp.toPx()))
+                        drawRect(Color.White, topLeft = Offset(0f, y - 0.5.dp.toPx()), size = Size(w, 1.dp.toPx()), alpha = 0.9f)
+
+                        // Twinkling four-point stars drifting upward.
+                        sparkles.forEach { sp ->
+                            val life = (t * sp.speed + sp.phase) % 1f
+                            val alpha = kotlin.math.sin(life * kotlin.math.PI.toFloat())
+                            val rad = sp.radius.dp.toPx() * (0.5f + 0.5f * alpha)
+                            val center = Offset(sp.x * w, sp.y * h - life * 60.dp.toPx())
+                            drawCircle(sp.color, radius = rad * 1.3f, center = center, alpha = alpha * 0.18f)
+                            val q = rad * 0.22f
+                            val star = Path().apply {
+                                moveTo(center.x, center.y - rad)
+                                lineTo(center.x + q, center.y - q)
+                                lineTo(center.x + rad, center.y)
+                                lineTo(center.x + q, center.y + q)
+                                lineTo(center.x, center.y + rad)
+                                lineTo(center.x - q, center.y + q)
+                                lineTo(center.x - rad, center.y)
+                                lineTo(center.x - q, center.y - q)
+                                close()
+                            }
+                            drawPath(star, sp.color, alpha = alpha)
+                        }
+                    },
+            ) {
+                Image(photo.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit)
+            }
         }
-        HintChip("正在找出照片里的主体…", Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp))
+        HintChip(tr("寻找主体", "Finding subject"), Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp), icon = Icons.Outlined.AutoAwesome)
     }
 }
 
@@ -522,7 +618,7 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
 
         Image(
             bitmap = stage.sticker.asImageBitmap(),
-            contentDescription = "贴纸",
+            contentDescription = tr("贴纸", "Sticker"),
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth(0.78f)
@@ -574,12 +670,12 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
                 .padding(bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            HintChip("用手指把贴纸往上揭下来，就能保存", icon = Icons.Outlined.TouchApp)
+            HintChip(tr("用手指把贴纸往上揭下来，就能保存", "Peel the sticker up to save"), icon = Icons.Outlined.TouchApp)
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PillButton("重拍", onClick = vm::reset)
-                PillButton("圈选主体", onClick = vm::startSelecting)
-                PillButton("直接保存", primary = true) {
+                PillButton(tr("重拍", "Retake"), onClick = vm::reset)
+                PillButton(tr("圈选主体", "Select subject"), onClick = vm::startSelecting)
+                PillButton(tr("直接保存", "Save as is"), primary = true) {
                     if (!flying) {
                         flying = true
                         scope.launch {
@@ -636,8 +732,8 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
             Modifier.padding(top = 14.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            PillButton("重拍", onClick = vm::reset)
-            PillButton("就它了", primary = true, enabled = state.hasSelection) {
+            PillButton(tr("重拍", "Retake"), onClick = vm::reset)
+            PillButton(tr("就它了", "Use this"), primary = true, enabled = state.hasSelection) {
                 scope.launch { state.sticker()?.let(vm::confirmSelection) }
             }
         }
@@ -670,7 +766,7 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                 StickerImage(c, Modifier.size(180.dp).holographic(0.3f, 3200))
             }
             Spacer(Modifier.height(16.dp))
-            Text("已收入图鉴", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(tr("已收入图鉴", "Added to collection"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             val c = capture
             val waiting = c == null || c.status == RecognitionStatus.PENDING || c.status == RecognitionStatus.RUNNING
@@ -678,7 +774,7 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                 val error = c?.errorMessage
                 if (error != null) {
                     Text(
-                        "$error，联网或设置好后会自动识别",
+                        tr("$error，联网或设置好后会自动识别", "$error. Will identify once online or set up"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
@@ -686,12 +782,12 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("正在识别…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("正在识别…", "Identifying…"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else if (c != null && c.status == RecognitionStatus.FAILED) {
                 Text(
-                    c.errorMessage ?: "没认出来，可以在详情里手动填名字",
+                    c.errorMessage ?: tr("没认出来，可以在详情里手动填名字", "Not recognized. Add a name in details"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
@@ -702,7 +798,7 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                     Text(c.displayName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                     val category = Category.fromKey(c.category)
                     Text(
-                        "${category.emoji} ${category.label}" + (c.nameSci?.let { " · $it" } ?: ""),
+                        "${category.emoji} ${category.display}" + (c.nameSci?.let { " · $it" } ?: ""),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     c.description?.let {
@@ -713,11 +809,11 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
             }
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { onOpenCapture(captureId) }) { Text("查看详情") }
+                OutlinedButton(onClick = { onOpenCapture(captureId) }) { Text(tr("查看详情", "View details")) }
                 Button(
                     onClick = vm::reset,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text("继续拍") }
+                ) { Text(tr("继续拍", "Keep shooting")) }
             }
         }
     }
@@ -734,7 +830,7 @@ private fun FailedMessage(message: String, onRetry: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Text(message, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text("再试一次") }
+        Button(onClick = onRetry) { Text(tr("再试一次", "Try again")) }
     }
 }
 

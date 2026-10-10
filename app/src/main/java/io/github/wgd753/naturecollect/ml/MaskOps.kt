@@ -1,19 +1,91 @@
 package io.github.wgd753.naturecollect.ml
 
-import kotlin.math.exp
-
 /** Pure mask utilities, kept free of Android types so they can be unit tested. */
 object MaskOps {
     /**
-     * Converts SAM logits to a soft alpha mask and drops islands that are not
-     * connected to any prompt point, so a stray blob doesn't end up on the sticker.
+     * Turns SAM logits into a clean sticker alpha. SAM's mask is upsampled from
+     * 256², so around uncertain areas (sky between branches) its logits hover
+     * near zero and a soft sigmoid leaves translucent, blocky smears. Instead:
+     * hard threshold, keep only what's connected to the prompt, fill pinholes,
+     * open away wisps and the upsampling grid, then re-antialias the contour.
      */
     fun toAlpha(logits: FloatArray, w: Int, h: Int, seeds: List<PromptPoint>): FloatArray {
-        val inside = BooleanArray(w * h) { logits[it] > 0f }
-        val keep = connectedTo(inside, w, h, seeds)
-        return FloatArray(w * h) { i ->
-            if (!keep[i] && inside[i]) 0f else sigmoid(logits[i] * EDGE_SHARPNESS).let { if (it < 0.02f) 0f else it }
+        val n = w * h
+        var mask = BooleanArray(n) { logits[it] > 0f }
+        mask = connectedTo(mask, w, h, seeds)
+        // Opening by 1px: drops specks and the upsampling grid but keeps twigs and antennae.
+        val r = 1
+        mask = threshold(boxBlur(toFloat(mask), w, h, r), 0.999f)
+        mask = threshold(boxBlur(toFloat(mask), w, h, r), 0.001f)
+        mask = connectedTo(mask, w, h, seeds)
+        fillHoles(mask, w, h, maxHole = n / 600)
+        // Smooth, ~2px antialiased edge instead of stair steps.
+        val soft = boxBlur(boxBlur(toFloat(mask), w, h, 1), w, h, 1)
+        return FloatArray(n) { smoothstep(0.3f, 0.7f, soft[it]) }
+    }
+
+    /** Separable box blur with clamped edges; two passes approximate a gaussian. */
+    fun boxBlur(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+        if (r <= 0) return src.copyOf()
+        val tmp = FloatArray(w * h)
+        val out = FloatArray(w * h)
+        val win = (2 * r + 1).toFloat()
+        for (y in 0 until h) {
+            val row = y * w
+            var sum = 0f
+            for (k in -r..r) sum += src[row + k.coerceIn(0, w - 1)]
+            for (x in 0 until w) {
+                tmp[row + x] = sum / win
+                sum += src[row + (x + r + 1).coerceAtMost(w - 1)] - src[row + (x - r).coerceAtLeast(0)]
+            }
         }
+        for (x in 0 until w) {
+            var sum = 0f
+            for (k in -r..r) sum += tmp[k.coerceIn(0, h - 1) * w + x]
+            for (y in 0 until h) {
+                out[y * w + x] = sum / win
+                sum += tmp[(y + r + 1).coerceAtMost(h - 1) * w + x] - tmp[(y - r).coerceAtLeast(0) * w + x]
+            }
+        }
+        return out
+    }
+
+    /** Fills background regions not reachable from the image border that are smaller than [maxHole] pixels. */
+    fun fillHoles(mask: BooleanArray, w: Int, h: Int, maxHole: Int) {
+        val seen = BooleanArray(w * h)
+        val stack = IntArray(w * h)
+        val region = IntArray(w * h)
+        for (start in 0 until w * h) {
+            if (mask[start] || seen[start]) continue
+            var top = 0
+            var count = 0
+            var touchesEdge = false
+            stack[top++] = start
+            seen[start] = true
+            while (top > 0) {
+                val i = stack[--top]
+                region[count++] = i
+                val x = i % w
+                val y = i / w
+                if (x == 0 || y == 0 || x == w - 1 || y == h - 1) touchesEdge = true
+                if (x > 0 && !mask[i - 1] && !seen[i - 1]) { seen[i - 1] = true; stack[top++] = i - 1 }
+                if (x < w - 1 && !mask[i + 1] && !seen[i + 1]) { seen[i + 1] = true; stack[top++] = i + 1 }
+                if (y > 0 && !mask[i - w] && !seen[i - w]) { seen[i - w] = true; stack[top++] = i - w }
+                if (y < h - 1 && !mask[i + w] && !seen[i + w]) { seen[i + w] = true; stack[top++] = i + w }
+            }
+            if (!touchesEdge && count <= maxHole) {
+                for (k in 0 until count) mask[region[k]] = true
+            }
+        }
+    }
+
+    private fun toFloat(mask: BooleanArray) = FloatArray(mask.size) { if (mask[it]) 1f else 0f }
+
+    private fun threshold(values: FloatArray, t: Float) = BooleanArray(values.size) { values[it] > t }
+
+    fun smoothstep(e0: Float, e1: Float, x: Float): Float {
+        val t = ((x - e0) / (e1 - e0)).coerceIn(0f, 1f)
+        return t * t * (3 - 2 * t)
     }
 
     /** Flood-fills from each seed; falls back to the whole mask if no seed lands inside it. */
@@ -87,8 +159,4 @@ object MaskOps {
         return if (right < 0) null else intArrayOf(left, top, right + 1, bottom + 1)
     }
 
-    private fun sigmoid(x: Float): Float = 1f / (1f + exp(-x))
-
-    /** SAM logits are steep around 0; scaling keeps about a pixel of feathering. */
-    private const val EDGE_SHARPNESS = 1.5f
 }

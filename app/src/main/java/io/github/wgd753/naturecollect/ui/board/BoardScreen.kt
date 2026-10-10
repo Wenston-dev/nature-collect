@@ -1,5 +1,7 @@
 package io.github.wgd753.naturecollect.ui.board
 
+import io.github.wgd753.naturecollect.ui.Mascot
+import io.github.wgd753.naturecollect.R
 import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInVertically
@@ -150,6 +152,7 @@ import io.github.wgd753.naturecollect.ui.FilterPill
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.InkSoft
 import kotlinx.coroutines.Dispatchers
@@ -239,7 +242,7 @@ private fun BoardEditor(
         if (uri != null) {
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri, maxSide = 1600) }
-                if (bitmap != null) importPhoto = bitmap else Toast.makeText(context, "这张图片打不开", Toast.LENGTH_SHORT).show()
+                if (bitmap != null) importPhoto = bitmap else Toast.makeText(context, tr("这张图片打不开", "Couldn't open this image"), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -270,13 +273,13 @@ private fun BoardEditor(
         ) {
             BoardSwitcher(board, boards, onSelectBoard, onNewBoard, onRename = { onBoardChange(board.copy(name = it)) }, onDelete = onDeleteBoard)
             Spacer(Modifier.weight(1f))
-            HeaderIconButton(if (fullscreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (fullscreen) "退出全屏" else "全屏", onClick = onToggleFullscreen)
-            HeaderIconButton(Icons.Outlined.FileDownload, "保存到相册") {
+            HeaderIconButton(if (fullscreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (fullscreen) tr("退出全屏", "Exit full screen") else tr("全屏", "Full screen"), onClick = onToggleFullscreen)
+            HeaderIconButton(Icons.Outlined.FileDownload, tr("保存到相册", "Save to gallery")) {
                 selectedItemId = null
                 scope.launch {
                     val bitmap = exportLayer.toImageBitmap().asAndroidBitmap()
                     val where = withContext(Dispatchers.IO) { Gallery.save(context, bitmap, board.name) }
-                    Toast.makeText(context, "已保存到$where", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, tr("已保存到$where", "Saved to $where"), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -325,10 +328,9 @@ private fun BoardEditor(
                     }
                 }
                 if (items.isEmpty() && tool == Tool.MOVE) {
-                    Text(
-                        "🧩",
-                        modifier = Modifier.align(Alignment.Center),
-                        fontSize = 40.sp,
+                    Mascot(
+                        R.drawable.art_mascot_sleep,
+                        Modifier.align(Alignment.Center).size(140.dp).graphicsLayer { alpha = 0.85f },
                     )
                 }
             }
@@ -351,7 +353,7 @@ private fun BoardEditor(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ColorSwatchButton(penColor, "画笔颜色", onPick = { penColor = it })
+                    ColorSwatchButton(penColor, tr("画笔颜色", "Pen color"), onPick = { penColor = it })
                     Slider(
                         value = penWidth,
                         onValueChange = { penWidth = it },
@@ -360,9 +362,9 @@ private fun BoardEditor(
                     )
                     IconButton(onClick = {
                         items.lastOrNull { it.type == BoardItemType.DRAWING }?.let { scope.launch { container.boards.deleteItem(it.id) } }
-                    }) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "撤销一笔", tint = MaterialTheme.colorScheme.primary) }
+                    }) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = tr("撤销一笔", "Undo stroke"), tint = MaterialTheme.colorScheme.primary) }
                     IconButton(onClick = { tool = Tool.MOVE }) {
-                        Icon(Icons.Outlined.Check, contentDescription = "完成", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.Check, contentDescription = tr("完成", "Done"), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
                 1 -> Row(
@@ -372,30 +374,30 @@ private fun BoardEditor(
                 ) {
                     val item = selectedItem
                     if (item?.type == BoardItemType.TEXT) {
-                        ColorSwatchButton(item.color, "文字颜色", onPick = { c -> scope.launch { container.boards.setColor(item, c) } })
+                        ColorSwatchButton(item.color, tr("文字颜色", "Text color"), onPick = { c -> scope.launch { container.boards.setColor(item, c) } })
                     }
                     IconButton(onClick = { item?.let { scope.launch { container.boards.bringToFront(it) } } }) {
-                        Icon(Icons.Outlined.FlipToFront, contentDescription = "放到最上层", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.FlipToFront, contentDescription = tr("放到最上层", "Bring to front"), tint = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = {
                         item?.let { scope.launch { container.boards.deleteItem(it.id) } }
                         selectedItemId = null
-                    }) { Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除", tint = MaterialTheme.colorScheme.error) }
+                    }) { Icon(Icons.Outlined.DeleteOutline, contentDescription = tr("删除", "Delete"), tint = MaterialTheme.colorScheme.error) }
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { selectedItemId = null }) {
-                        Icon(Icons.Outlined.Check, contentDescription = "完成", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.Check, contentDescription = tr("完成", "Done"), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
                 else -> Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(6.dp),
                 ) {
-                    BarTool(Icons.Outlined.EmojiNature, "贴纸") { sheet = Sheet.STICKERS }
-                    BarTool(Icons.Outlined.TextFields, "文字") { showTextDialog = true }
-                    BarTool(Icons.Outlined.Draw, "画笔") {
+                    BarTool(Icons.Outlined.EmojiNature, tr("贴纸", "Stickers")) { sheet = Sheet.STICKERS }
+                    BarTool(Icons.Outlined.TextFields, tr("文字", "Text")) { showTextDialog = true }
+                    BarTool(Icons.Outlined.Draw, tr("画笔", "Pen")) {
                         tool = Tool.PEN
                         selectedItemId = null
                     }
-                    BarTool(Icons.Outlined.Palette, "背景") { sheet = Sheet.BACKGROUND }
+                    BarTool(Icons.Outlined.Palette, tr("背景", "Background")) { sheet = Sheet.BACKGROUND }
                 }
             }
         }
@@ -423,7 +425,7 @@ private fun BoardEditor(
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "从相册导入", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = tr("从相册导入", "Import from gallery"), tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                     items(captures, key = { it.id }) { capture ->
@@ -445,7 +447,7 @@ private fun BoardEditor(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("空白", "点阵", "方格").forEachIndexed { index, label ->
+                        listOf(tr("空白", "Blank"), tr("点阵", "Dots"), tr("方格", "Grid")).forEachIndexed { index, label ->
                             FilterPill(label, selected = board.pattern == index) { onBoardChange(board.copy(pattern = index)) }
                         }
                     }
@@ -513,7 +515,7 @@ private fun BoardSwitcher(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(board.name, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground, maxLines = 1)
-            Icon(Icons.Outlined.ExpandMore, contentDescription = "切换画板", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Outlined.ExpandMore, contentDescription = tr("切换画板", "Switch board"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             boards.forEach { b ->
@@ -527,17 +529,17 @@ private fun BoardSwitcher(
                 )
             }
             HorizontalDivider()
-            DropdownMenuItem(text = { Text("新画板") }, leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) }, onClick = {
+            DropdownMenuItem(text = { Text(tr("新画板", "New board")) }, leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) }, onClick = {
                 open = false
                 naming = "new"
             })
-            DropdownMenuItem(text = { Text("重命名") }, leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }, onClick = {
+            DropdownMenuItem(text = { Text(tr("重命名", "Rename")) }, leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }, onClick = {
                 open = false
                 naming = "rename"
             })
             if (boards.size > 1) {
                 DropdownMenuItem(
-                    text = { Text("删除画板", color = MaterialTheme.colorScheme.error) },
+                    text = { Text(tr("删除画板", "Delete board"), color = MaterialTheme.colorScheme.error) },
                     leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                     onClick = {
                         open = false
@@ -549,7 +551,7 @@ private fun BoardSwitcher(
     }
     naming?.let { mode ->
         NameDialog(
-            title = if (mode == "new") "新画板" else "重命名",
+            title = if (mode == "new") tr("新画板", "New board") else tr("重命名", "Rename"),
             initial = if (mode == "new") "" else board.name,
             onDismiss = { naming = null },
         ) { name ->
@@ -560,15 +562,15 @@ private fun BoardSwitcher(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("删除「${board.name}」？") },
-            text = { Text("贴纸本身还在图鉴里。") },
+            title = { Text(tr("删除「${board.name}」？", "Delete \"${board.name}\"?")) },
+            text = { Text(tr("贴纸本身还在图鉴里。", "Stickers stay in your collection.")) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     onDelete()
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("取消", "Cancel")) } },
         )
     }
 }
@@ -806,12 +808,12 @@ private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Floa
     var size by remember { mutableFloatStateOf(1f) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("文字") },
+        title = { Text(tr("文字", "Text")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = text, onValueChange = { text = it }, placeholder = { Text("写点什么") })
+                OutlinedTextField(value = text, onValueChange = { text = it }, placeholder = { Text(tr("写点什么", "Write something")) })
                 Text(
-                    text.ifBlank { "预览" },
+                    text.ifBlank { tr("预览", "Preview") },
                     color = Color(color),
                     fontFamily = fontFor(font),
                     fontWeight = FontWeight.Bold,
@@ -819,13 +821,13 @@ private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Floa
                     maxLines = 2,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("hand" to "手写", "round" to "圆体", "serif" to "衬线").forEach { (key, label) ->
+                    listOf("hand" to tr("手写", "Hand"), "round" to tr("圆体", "Round"), "serif" to tr("衬线", "Serif")).forEach { (key, label) ->
                         FilterPill(label, selected = font == key) { font = key }
                     }
                 }
                 Slider(value = size, onValueChange = { size = it }, valueRange = 0.6f..2.2f)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ColorSwatchButton(color, "文字颜色", onPick = { color = it }, size = 30.dp)
+                    ColorSwatchButton(color, tr("文字颜色", "Text color"), onPick = { color = it }, size = 30.dp)
                     QuickColors.take(8).forEach { c ->
                         Box(
                             Modifier
@@ -839,8 +841,8 @@ private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Floa
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onAdd(text.trim(), color, font, size) }, enabled = text.isNotBlank()) { Text("贴上去") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onAdd(text.trim(), color, font, size) }, enabled = text.isNotBlank()) { Text(tr("贴上去", "Add")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }
 
@@ -850,8 +852,8 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text("画板名字") }) },
-        confirmButton = { TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("好") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text(tr("画板名字", "Board name")) }) },
+        confirmButton = { TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text(tr("好", "OK")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }

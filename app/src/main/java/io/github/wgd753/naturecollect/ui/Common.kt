@@ -1,5 +1,6 @@
 package io.github.wgd753.naturecollect.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -100,10 +101,14 @@ fun HeaderIconButton(
 
 /** Centered placeholder shown while a page has nothing in it yet. */
 @Composable
-fun EmptyState(emoji: String, message: String, modifier: Modifier = Modifier) {
+fun EmptyState(emoji: String, message: String, modifier: Modifier = Modifier, @DrawableRes art: Int? = null) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(emoji, style = MaterialTheme.typography.displaySmall)
+            if (art != null) {
+                Mascot(art, Modifier.size(150.dp))
+            } else {
+                Text(emoji, style = MaterialTheme.typography.displaySmall)
+            }
             Text(
                 text = message,
                 modifier = Modifier.padding(top = 12.dp, start = 32.dp, end = 32.dp),
@@ -113,6 +118,29 @@ fun EmptyState(emoji: String, message: String, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/** A mascot illustration that bobs gently, so empty screens feel alive. */
+@Composable
+fun Mascot(@DrawableRes art: Int, modifier: Modifier = Modifier, bob: Boolean = true) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "bob")
+    val y by t.animateFloat(
+        initialValue = 0f,
+        targetValue = if (bob) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(1600, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "y",
+    )
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(art),
+        contentDescription = null,
+        modifier = modifier.graphicsLayer {
+            translationY = -8.dp.toPx() * y
+            rotationZ = (y - 0.5f) * 3f
+        },
+    )
 }
 
 /** The die-cut sticker image for a capture. */
@@ -152,14 +180,14 @@ fun CategoryFilterRow(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterPill(text = "全部", selected = selected == null) { onSelect(null) }
+        FilterPill(text = tr("全部", "All"), selected = selected == null) { onSelect(null) }
         Category.entries.filter { available == null || it.key in available }.forEach { category ->
             val isSelected = selected?.key == category.key
-            FilterPill(text = "${category.emoji} ${category.label}", selected = isSelected, tint = category.tint) {
+            FilterPill(text = "${category.emoji} ${category.display}", selected = isSelected, tint = category.tint) {
                 onSelect(if (isSelected) null else category)
             }
         }
-        if (onManage != null) FilterPill(text = "＋ 分类", selected = false, onClick = onManage)
+        if (onManage != null) FilterPill(text = tr("＋ 分类", "＋ Category"), selected = false, onClick = onManage)
     }
 }
 
@@ -261,7 +289,7 @@ fun Modifier.holographic(
 val Category.tint: Color get() = Color(color)
 
 fun formatDate(millis: Long): String =
-    java.text.SimpleDateFormat("yyyy年M月d日 HH:mm", java.util.Locale.CHINA).format(java.util.Date(millis))
+    java.text.SimpleDateFormat(tr("yyyy年M月d日 HH:mm", "MMM d, yyyy HH:mm"), if (Lang.english) java.util.Locale.ENGLISH else java.util.Locale.CHINA).format(java.util.Date(millis))
 
 fun formatDay(millis: Long): String =
-    java.text.SimpleDateFormat("yyyy年M月d日", java.util.Locale.CHINA).format(java.util.Date(millis))
+    java.text.SimpleDateFormat(tr("yyyy年M月d日", "MMM d, yyyy"), if (Lang.english) java.util.Locale.ENGLISH else java.util.Locale.CHINA).format(java.util.Date(millis))

@@ -1,5 +1,7 @@
 package io.github.wgd753.naturecollect.ui.collection
 
+import androidx.compose.foundation.layout.offset
+import io.github.wgd753.naturecollect.R
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -97,6 +99,7 @@ import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.tint
+import io.github.wgd753.naturecollect.ui.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -137,19 +140,19 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
         if (exporting || shown.isEmpty()) return
         exporting = true
         scope.launch {
-            val title = filter?.let { "我的${it.label}图鉴" } ?: "我的自然图鉴"
+            val title = filter?.let { tr("我的${it.display}图鉴", "My ${it.display}") } ?: tr("我的自然图鉴", "My nature collection")
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val poster = PosterRenderer(container.media).render(shown, title)
                     try {
-                        Gallery.save(context, poster, "图鉴", jpeg = true)
+                        Gallery.save(context, poster, tr("图鉴", "collection"), jpeg = true)
                     } finally {
                         poster.recycle()
                     }
                 }
             }
             exporting = false
-            val message = result.fold({ "图鉴长图已保存到$it" }, { "导出失败：${it.message ?: it.javaClass.simpleName}" })
+            val message = result.fold({ tr("图鉴长图已保存到$it", "Saved to $it") }, { tr("导出失败：", "Export failed: ") + (it.message ?: it.javaClass.simpleName) })
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
@@ -170,20 +173,20 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
                     onDelete = { confirmDelete = true },
                 )
             } else {
-                PageHeader("图鉴") {
+                PageHeader(tr("图鉴", "Collection")) {
                     if (exporting) {
                         Box(Modifier.padding(start = 8.dp).size(42.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         }
                     } else {
-                        HeaderIconButton(Icons.Outlined.FileDownload, "导出图鉴长图", enabled = shown.isNotEmpty()) { export() }
+                        HeaderIconButton(Icons.Outlined.FileDownload, tr("导出图鉴长图", "Export poster"), enabled = shown.isNotEmpty()) { export() }
                     }
-                    HeaderIconButton(Icons.Outlined.Settings, "设置", onClick = onOpenSettings)
+                    HeaderIconButton(Icons.Outlined.Settings, tr("设置", "Settings"), onClick = onOpenSettings)
                 }
             }
         }
         if (captures != null && all.isEmpty()) {
-            EmptyState("🌿", "还没有收集到任何东西\n去「拍照」拍下第一只小鸟或一朵花吧")
+            EmptyState("🌿", art = R.drawable.art_mascot_camera, message = tr("还没有收集\n去拍下第一只小鸟或一朵花吧", "Nothing here yet\nGo snap a bird or a flower"))
             return@Column
         }
         LazyVerticalGrid(
@@ -210,7 +213,7 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
                         Text("🔑", fontSize = 20.sp)
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "还没填 DeepSeek API Key，拍到的东西不会自动识别。点这里去设置",
+                            tr("还没填 DeepSeek API Key，拍到的东西不会自动识别。点这里去设置", "No DeepSeek API key yet, so photos won't be identified. Tap to set it up"),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
@@ -253,17 +256,17 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
         val records = doomed.sumOf { it.captures.size }
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("删除 ${doomed.size} 个条目？") },
-            text = { Text("会一并删除这些条目下的 $records 条记录、照片和贴纸板上的贴纸，删除后无法恢复。") },
+            title = { Text(tr("删除 ${doomed.size} 个条目？", "Delete ${doomed.size} entries?")) },
+            text = { Text(tr("会一并删除这些条目下的 $records 条记录、照片和贴纸板上的贴纸，删除后无法恢复。", "This also deletes their $records records, photos and board stickers. It can't be undone.")) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     val ids = doomed.flatMap { group -> group.captures.map { it.id } }
                     selected = emptySet()
                     scope.launch { container.captures.deleteAll(ids) }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("取消", "Cancel")) } },
         )
     }
 }
@@ -277,11 +280,11 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, contentDescription = "取消选择", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Outlined.Close, contentDescription = tr("取消选择", "Clear selection"), tint = MaterialTheme.colorScheme.primary)
         }
-        Text("已选 $count 个", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(tr("已选 $count 个", "$count selected"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onSelectAll) { Text("全选") }
+        TextButton(onClick = onSelectAll) { Text(tr("全选", "Select all")) }
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
@@ -292,7 +295,7 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
         ) {
             Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text("删除", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(tr("删除", "Delete"), color = Color.White, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -302,12 +305,25 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
 private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, newThisMonth: Int) {
     val counts = remember(groups) { groups.groupingBy { it.category.key }.eachCount() }
     val categories = Category.entries.filter { (counts[it.key] ?: 0) > 0 }
-    Column(
+    Box(
         Modifier
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(26.dp), spotColor = Forest.copy(alpha = 0.3f))
             .clip(RoundedCornerShape(26.dp))
-            .background(Card)
+            .background(Card),
+    ) {
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(R.drawable.art_deco_leaves),
+        contentDescription = null,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 18.dp, y = (-14).dp)
+            .size(78.dp)
+            .graphicsLayer { rotationZ = 18f; alpha = 0.22f },
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
             .padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -319,11 +335,11 @@ private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, 
                 ) { n ->
                     Text("$n", color = Forest, fontSize = 46.sp, fontWeight = FontWeight.Black, lineHeight = 48.sp)
                 }
-                Text("种已收集", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                Text(tr("种已收集", "species"), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             }
-            StatColumn("$total", "次遇见")
+            StatColumn("$total", tr("次遇见", "sightings"))
             Spacer(Modifier.width(18.dp))
-            StatColumn("+$newThisMonth", "本月新种")
+            StatColumn("+$newThisMonth", tr("本月新种", "new this month"))
         }
         if (categories.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
@@ -344,6 +360,7 @@ private fun HeroCard(groups: List<SpeciesGroup>, speciesCount: Int, total: Int, 
                 }
             }
         }
+    }
     }
 }
 
@@ -455,20 +472,20 @@ private fun SpeciesCell(
                         .border(2.dp, if (selected) accent else Color.LightGray, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "已选", tint = accent, modifier = Modifier.size(26.dp))
+                    if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = tr("已选", "Selected"), tint = accent, modifier = Modifier.size(26.dp))
                 }
             }
         }
         Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
             Text(
-                text = if (recognizing && cover.nameZh == null) "识别中…" else group.name,
+                text = if (recognizing && cover.nameZh == null) tr("识别中…", "Identifying…") else group.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = group.nameSci ?: group.category.label,
+                text = group.nameSci ?: group.category.display,
                 style = MaterialTheme.typography.labelMedium,
                 fontStyle = if (group.nameSci != null) FontStyle.Italic else FontStyle.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

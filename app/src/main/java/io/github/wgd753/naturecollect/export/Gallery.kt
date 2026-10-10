@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import io.github.wgd753.naturecollect.ui.tr
 import java.io.File
 
 /** Saves images into the phone's gallery under Pictures/自然收集. */
@@ -23,9 +24,9 @@ object Gallery {
                 put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/自然收集")
             }
             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: error("无法写入相册")
+                ?: error(tr("无法写入相册", "Couldn't save to gallery"))
             context.contentResolver.openOutputStream(uri)?.use { bitmap.compress(format, quality, it) }
-            return "相册的「自然收集」文件夹"
+            return tr("相册的「自然收集」文件夹", "Pictures/自然收集")
         }
         val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "export").apply { mkdirs() }
         File(dir, fileName).outputStream().use { bitmap.compress(format, quality, it) }

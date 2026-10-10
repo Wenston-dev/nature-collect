@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.ui.tr
 
 /**
  * Photo + selection tools shared by the camera and the board's gallery import:
@@ -39,14 +40,14 @@ import io.github.wgd753.naturecollect.ui.FilterPill
 @Composable
 fun ColumnScope.CutoutEditor(state: CutoutState) {
     Text(
-        text = if (state.erasing) "涂抹要擦掉的部分" else "圈出或点选",
+        text = if (state.erasing) tr("涂抹要擦掉的部分", "Paint over what to erase") else tr("圈出或点选", "Circle or tap"),
         modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 6.dp),
         style = MaterialTheme.typography.titleMedium,
         color = if (state.erasing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
     )
     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
         when {
-            state.error != null -> Text("抠图失败：${state.error}", color = MaterialTheme.colorScheme.error)
+            state.error != null -> Text(tr("抠图失败：${state.error}", "Cutout failed: ${state.error}"), color = MaterialTheme.colorScheme.error)
             else -> SubjectPicker(
                 bitmap = state.image.bitmap,
                 overlay = state.overlay,
@@ -67,7 +68,7 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("范围", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("范围", "Range"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             sizeLabels(state.optionCount).forEachIndexed { index, label ->
                 Box(Modifier.padding(horizontal = 3.dp)) {
@@ -80,9 +81,9 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
         Modifier.fillMaxWidth().padding(top = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        ToolChip(Icons.Outlined.Gesture, "圈选", selected = !state.erasing) { state.erasing = false }
-        ToolChip(Icons.Outlined.AutoFixHigh, "橡皮擦", selected = state.erasing, enabled = state.canErase) { state.erasing = true }
-        ToolChip(Icons.AutoMirrored.Outlined.Undo, "撤回", selected = false, enabled = state.canUndo) { state.undo() }
+        ToolChip(Icons.Outlined.Gesture, tr("圈选", "Select"), selected = !state.erasing) { state.erasing = false }
+        ToolChip(Icons.Outlined.AutoFixHigh, tr("橡皮擦", "Erase"), selected = state.erasing, enabled = state.canErase) { state.erasing = true }
+        ToolChip(Icons.AutoMirrored.Outlined.Undo, tr("撤回", "Undo"), selected = false, enabled = state.canUndo) { state.undo() }
     }
 }
 
@@ -109,8 +110,8 @@ private fun ToolChip(icon: ImageVector, label: String, selected: Boolean, enable
 }
 
 private fun sizeLabels(count: Int): List<String> = when (count) {
-    2 -> listOf("小", "大")
-    3 -> listOf("小", "中", "大")
-    else -> listOf("小", "中", "大", "最大").take(count)
+    2 -> listOf(tr("小", "S"), tr("大", "L"))
+    3 -> listOf(tr("小", "S"), tr("中", "M"), tr("大", "L"))
+    else -> listOf(tr("小", "S"), tr("中", "M"), tr("大", "L"), tr("最大", "XL")).take(count)
 }
 

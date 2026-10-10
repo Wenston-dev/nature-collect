@@ -76,12 +76,14 @@ private const val SETTINGS_ROUTE = "settings"
 private const val CATEGORIES_ROUTE = "categories"
 
 /** The five bottom tabs, in display order. */
-enum class Tab(val route: String, val label: String, val icon: ImageVector) {
-    Board("board", "贴纸板", Icons.Outlined.AutoAwesomeMosaic),
-    Camera("camera", "拍照", Icons.Outlined.PhotoCamera),
-    Calendar("calendar", "日历", Icons.Outlined.CalendarMonth),
-    Globe("globe", "地图", Icons.Outlined.Public),
-    Collection("collection", "图鉴", Icons.AutoMirrored.Outlined.MenuBook),
+enum class Tab(val route: String, private val zh: String, private val en: String, val icon: ImageVector) {
+    Board("board", "贴纸板", "Board", Icons.Outlined.AutoAwesomeMosaic),
+    Camera("camera", "拍照", "Camera", Icons.Outlined.PhotoCamera),
+    Calendar("calendar", "日历", "Calendar", Icons.Outlined.CalendarMonth),
+    Globe("globe", "地图", "Map", Icons.Outlined.Public),
+    Collection("collection", "图鉴", "Collection", Icons.AutoMirrored.Outlined.MenuBook);
+
+    val label: String get() = tr(zh, en)
 }
 
 private val slideIn: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {

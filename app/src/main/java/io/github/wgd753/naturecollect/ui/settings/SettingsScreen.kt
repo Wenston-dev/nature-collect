@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.ui.theme.Card
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
         if (uri != null) {
             scope.launch {
                 val message = runCatching { container.backup.export(uri) }
-                    .fold({ "已导出 $it 条收集" }, { "导出失败：${it.message}" })
+                    .fold({ tr("已导出 $it 条收集", "Exported $it finds") }, { tr("导出失败：", "Export failed: ") + it.message })
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
         }
@@ -73,7 +74,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
         if (uri != null) {
             scope.launch {
                 val message = runCatching { container.backup.import(uri) }
-                    .fold({ "已导入 $it 条收集" }, { "导入失败：${it.message}" })
+                    .fold({ tr("已导入 $it 条收集", "Imported $it finds") }, { tr("导入失败：", "Import failed: ") + it.message })
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 container.recognition.schedule()
             }
@@ -83,9 +84,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = MaterialTheme.colorScheme.primary)
             }
-            Text("设置", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(tr("设置", "Settings"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         }
         Column(
             Modifier
@@ -94,9 +95,12 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Section("物种识别（DeepSeek）") {
+            Section(tr("物种识别（DeepSeek）", "Identification (DeepSeek)")) {
                 Text(
-                    "识别使用 DeepSeek V4.1 Flash。到 platform.deepseek.com 创建 API Key 后填在这里，Key 会加密保存在手机上。",
+                    tr(
+                        "识别使用 DeepSeek V4.1 Flash。到 platform.deepseek.com 创建 API Key 后填在这里，Key 会加密保存在手机上。",
+                        "Uses DeepSeek V4.1 Flash. Create an API key at platform.deepseek.com and paste it here. It's stored encrypted on this phone.",
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -109,7 +113,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         IconButton(onClick = { reveal = !reveal }) {
-                            Icon(if (reveal) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = "显示")
+                            Icon(if (reveal) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = tr("显示", "Show"))
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -122,60 +126,71 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                             container.captures.unrecognized().forEach { container.captures.markPending(it.id) }
                             container.recognition.schedule()
                         }
-                        Toast.makeText(context, if (key.isBlank()) "已清除" else "已保存，开始识别待识别的收集", Toast.LENGTH_SHORT).show()
-                    }) { Text("保存") }
+                        Toast.makeText(context, if (key.isBlank()) tr("已清除", "Cleared") else tr("已保存，开始识别待识别的收集", "Saved. Identifying pending finds"), Toast.LENGTH_SHORT).show()
+                    }) { Text(tr("保存", "Save")) }
                     OutlinedButton(onClick = {
                         scope.launch {
                             container.captures.unrecognized().forEach { container.captures.markPending(it.id) }
                             container.recognition.schedule()
-                            Toast.makeText(context, "已重新排队识别", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, tr("已重新排队识别", "Queued for retry"), Toast.LENGTH_SHORT).show()
                         }
-                    }) { Text("重试失败的识别") }
+                    }) { Text(tr("重试失败的识别", "Retry failed")) }
                 }
             }
 
-            Section("图鉴分类") {
+            Section(tr("图鉴分类", "Categories")) {
                 Text(
-                    "添加或修改分类（emoji + 名字），拍照识别时 AI 会从这些分类里挑。",
+                    tr("添加或修改分类（emoji + 名字），拍照识别时 AI 会从这些分类里挑。", "Add or edit categories (emoji + name). AI picks from these when identifying."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(onClick = onOpenCategories) { Text("管理分类") }
+                OutlinedButton(onClick = onOpenCategories) { Text(tr("管理分类", "Manage categories")) }
             }
 
-            Section("地图底图") {
+            Section(tr("地图底图", "Map source")) {
                 val source by container.settings.mapSource.collectAsState()
                 Text(
-                    "高德底图在国内加载快；OpenStreetMap 适合在国外用。",
+                    tr("高德底图在国内加载快；OpenStreetMap 适合在国外用。", "Amap is fast in mainland China; OpenStreetMap works better abroad."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterPill("高德（国内）", selected = source == Settings.MAP_AMAP) { container.settings.setMapSource(Settings.MAP_AMAP) }
+                    FilterPill(tr("高德（国内）", "Amap (China)"), selected = source == Settings.MAP_AMAP) { container.settings.setMapSource(Settings.MAP_AMAP) }
                     FilterPill("OpenStreetMap", selected = source == Settings.MAP_OSM) { container.settings.setMapSource(Settings.MAP_OSM) }
                 }
             }
 
-            Section("备份") {
+            Section(tr("语言", "Language")) {
+                val language by container.settings.language.collectAsState()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterPill("中文", selected = language == Settings.LANG_ZH) { container.settings.setLanguage(Settings.LANG_ZH) }
+                    FilterPill("English", selected = language == Settings.LANG_EN) { container.settings.setLanguage(Settings.LANG_EN) }
+                }
+            }
+
+            Section(tr("备份", "Backup")) {
                 Text(
-                    "所有收集、贴纸和画板打包成一个 zip。换手机时导出，再在新手机上导入。",
+                    tr("所有收集、贴纸和画板打包成一个 zip。换手机时导出，再在新手机上导入。", "Packs all finds, stickers and boards into one zip. Export it, then import on your new phone."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = {
                         val stamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-                        exportLauncher.launch("自然收集备份-$stamp.zip")
-                    }) { Text("导出备份") }
+                        exportLauncher.launch(tr("自然收集备份-$stamp.zip", "NatureCollect-backup-$stamp.zip"))
+                    }) { Text(tr("导出备份", "Export")) }
                     OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
-                        Text("导入备份")
+                        Text(tr("导入备份", "Import"))
                     }
                 }
             }
 
-            Section("关于") {
+            Section(tr("关于", "About")) {
                 Text(
-                    "抠图：MobileSAM（在手机本地运行，不上传照片）\n识别：DeepSeek V4.1 Flash（只上传抠好的贴纸）\n地图：MapLibre + OpenFreeMap（OpenStreetMap 数据）",
+                    tr(
+                        "抠图：MobileSAM（在手机本地运行，不上传照片）\n识别：DeepSeek V4.1 Flash（只上传抠好的贴纸）\n地图：MapLibre + OpenFreeMap（OpenStreetMap 数据）",
+                        "Cutout: MobileSAM (runs on device, photos stay local)\nIdentification: DeepSeek V4.1 Flash (only the sticker is uploaded)\nMap: MapLibre + OpenFreeMap (OpenStreetMap data)",
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

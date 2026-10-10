@@ -158,8 +158,8 @@ fun ColorPickerDialog(initial: Long, title: String, onDismiss: () -> Unit, onPic
             }
         },
         text = { ColorPicker(color, onChange = { color = it }) },
-        confirmButton = { TextButton(onClick = { onPick(color) }) { Text("好") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onPick(color) }) { Text(tr("好", "OK")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
 }
 

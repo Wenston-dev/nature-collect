@@ -13,6 +13,7 @@ import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import io.github.wgd753.naturecollect.location.PlaceResolver
+import io.github.wgd753.naturecollect.ui.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,14 +88,14 @@ class RecognitionService(
         var retry = false
         for (capture in repository.unrecognized()) {
             if (apiKey.isNullOrBlank()) {
-                repository.update(capture.copy(status = RecognitionStatus.PENDING, errorMessage = "还没有设置 DeepSeek API Key"))
+                repository.update(capture.copy(status = RecognitionStatus.PENDING, errorMessage = tr("还没有设置 DeepSeek API Key", "No DeepSeek API key set")))
                 continue
             }
             if (capture.status == RecognitionStatus.FAILED) continue
             repository.update(capture.copy(status = RecognitionStatus.RUNNING, errorMessage = null))
             try {
                 val sticker = BitmapFactory.decodeFile(media.file(capture.stickerFile).path)
-                    ?: error("贴纸文件丢失")
+                    ?: error(tr("贴纸文件丢失", "Sticker file missing"))
                 val result = recognizer.recognize(
                     apiKey = apiKey,
                     image = StickerMaker.onWhite(sticker),
@@ -123,7 +124,7 @@ class RecognitionService(
                 repository.get(capture.id)?.let { repository.update(it.copy(status = status, errorMessage = e.message)) }
             } catch (e: Exception) {
                 repository.get(capture.id)?.let {
-                    repository.update(it.copy(status = RecognitionStatus.FAILED, errorMessage = e.message ?: "识别失败"))
+                    repository.update(it.copy(status = RecognitionStatus.FAILED, errorMessage = e.message ?: tr("识别失败", "Identification failed")))
                 }
             }
         }
@@ -133,7 +134,7 @@ class RecognitionService(
     /** Translates a typed name (Chinese, English or Latin) into the full set of names. */
     suspend fun lookupName(query: String): RecognitionResult {
         val apiKey = settings.apiKey.value
-        if (apiKey.isNullOrBlank()) throw RecognitionException("设置 DeepSeek API Key 后可以自动翻译", retryable = false)
+        if (apiKey.isNullOrBlank()) throw RecognitionException(tr("设置 DeepSeek API Key 后可以自动翻译", "Set a DeepSeek API key to look up names"), retryable = false)
         return recognizer.lookup(apiKey, query)
     }
 

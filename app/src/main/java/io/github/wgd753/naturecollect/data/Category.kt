@@ -21,6 +21,14 @@ data class Category(
     /** Kept so existing code that stored `category.name` still reads naturally. */
     val name: String get() = key
 
+    /** Label to show: built-in names follow the app language until the user renames them. */
+    val display: String
+        get() {
+            if (!io.github.wgd753.naturecollect.ui.Lang.english) return label
+            val i = defaults.indexOfFirst { it.key == key }
+            return if (i >= 0 && defaults[i].label == label) EnglishLabels[i] else label
+        }
+
     companion object {
         const val OTHER_KEY = "OTHER"
 
@@ -32,6 +40,8 @@ data class Category(
             Category("ANIMAL", "动物", "🐾", 0xFF9C6B3E, "其他动物，包括猫狗、鱼、爬行动物"),
             Category(OTHER_KEY, "其他", "✨", 0xFF7A6FD8, "不属于以上任何一类，或不是生物"),
         )
+
+        private val EnglishLabels = listOf("Birds", "Flowers", "Plants", "Insects", "Animals", "Other")
 
         // Snapshot state: composables reading the list recompose when the user edits it.
         private val state = mutableStateOf(defaults)

@@ -5,13 +5,8 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /** Turns an image plus an alpha mask into a die-cut sticker with a white border and soft shadow. */
 object StickerMaker {
@@ -38,37 +33,38 @@ object StickerMaker {
             }
         }
         val cutout = Bitmap.createBitmap(pixels, boxW, boxH, Bitmap.Config.ARGB_8888)
-        val silhouette = cutout.extractAlpha()
 
-        val out = Bitmap.createBitmap(boxW + margin * 2, boxH + margin * 2, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(out)
-        val ox = margin.toFloat()
-        val oy = margin.toFloat()
-
-        // Grow the silhouette by stamping it around a circle: cheap dilation for the border.
-        fun stamp(paint: Paint, radius: Float, dx: Float = 0f, dy: Float = 0f) {
-            val steps = 36
-            for (s in 0 until steps) {
-                val t = 2 * PI * s / steps
-                canvas.drawBitmap(silhouette, ox + dx + (cos(t) * radius).toFloat(), oy + dy + (sin(t) * radius).toFloat(), paint)
+        // White die-cut border: blur the silhouette and threshold low, which grows
+        // it by about [border] with rounded corners and bridges tiny gaps, so the
+        // outline stays smooth even where the mask edge is busy (leaves, fur).
+        val outW = boxW + margin * 2
+        val outH = boxH + margin * 2
+        val grown = FloatArray(outW * outH)
+        for (y in 0 until boxH) {
+            for (x in 0 until boxW) {
+                grown[(y + margin) * outW + x + margin] = alpha[(y + box[1]) * w + x + box[0]]
             }
-            canvas.drawBitmap(silhouette, ox + dx, oy + dy, paint)
         }
+        val r = (border * 0.75f).roundToInt().coerceAtLeast(2)
+        val blurred = MaskOps.boxBlur(MaskOps.boxBlur(grown, outW, outH, r), outW, outH, r)
+        val outlinePixels = IntArray(outW * outH) { i ->
+            val a = (MaskOps.smoothstep(0.04f, 0.16f, blurred[i]) * 255).roundToInt()
+            (a shl 24) or 0xFFFFFF
+        }
+        val outline = Bitmap.createBitmap(outlinePixels, outW, outH, Bitmap.Config.ARGB_8888)
 
+        val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(46, 40, 30, 20)
             maskFilter = BlurMaskFilter(shadow, BlurMaskFilter.Blur.NORMAL)
         }
-        stamp(shadowPaint, border, dy = shadow * 0.6f)
-
-        val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-            colorFilter = PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN)
-        }
-        stamp(whitePaint, border)
-        stamp(whitePaint, border * 0.5f)
-
-        canvas.drawBitmap(cutout, ox, oy, Paint(Paint.FILTER_BITMAP_FLAG))
-        silhouette.recycle()
+        val outlineAlpha = outline.extractAlpha()
+        canvas.drawBitmap(outlineAlpha, 0f, shadow * 0.6f, shadowPaint)
+        canvas.drawBitmap(outline, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG))
+        canvas.drawBitmap(cutout, margin.toFloat(), margin.toFloat(), Paint(Paint.FILTER_BITMAP_FLAG))
+        outlineAlpha.recycle()
+        outline.recycle()
         cutout.recycle()
         return out
     }

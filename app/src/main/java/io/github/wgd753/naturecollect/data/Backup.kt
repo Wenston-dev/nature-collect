@@ -8,6 +8,7 @@ import io.github.wgd753.naturecollect.data.db.BoardItemEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemType
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.data.db.RecognitionStatus
+import io.github.wgd753.naturecollect.ui.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -37,7 +38,7 @@ class Backup(
             .put("boards", JSONArray(boards.map { it.toJson() }))
             .put("boardItems", JSONArray(items.map { it.toJson() }))
             .put("categories", CategoryStore.encode(Category.entries))
-        val out = context.contentResolver.openOutputStream(target) ?: error("无法写入备份文件")
+        val out = context.contentResolver.openOutputStream(target) ?: error(tr("无法写入备份文件", "Couldn't write backup file"))
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(DATA_ENTRY))
             zip.write(json.toString().toByteArray())
@@ -57,7 +58,7 @@ class Backup(
 
     suspend fun import(source: Uri): Int = withContext(Dispatchers.IO) {
         var json: JSONObject? = null
-        val input = context.contentResolver.openInputStream(source) ?: error("无法读取备份文件")
+        val input = context.contentResolver.openInputStream(source) ?: error(tr("无法读取备份文件", "Couldn't read backup file"))
         ZipInputStream(input.buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
@@ -70,7 +71,7 @@ class Backup(
                 }
             }
         }
-        val data = json ?: error("这不是自然收集的备份文件")
+        val data = json ?: error(tr("这不是自然收集的备份文件", "Not a valid backup file"))
         val captures = data.getJSONArray("captures").objects().map { it.toCapture() }
         captures.forEach { db.captureDao().upsert(it) }
         data.optJSONArray("categories")?.let { array ->

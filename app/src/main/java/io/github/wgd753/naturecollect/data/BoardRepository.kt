@@ -4,6 +4,7 @@ import io.github.wgd753.naturecollect.data.db.BoardDao
 import io.github.wgd753.naturecollect.data.db.BoardEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemType
+import io.github.wgd753.naturecollect.ui.tr
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -13,7 +14,7 @@ class BoardRepository(private val dao: BoardDao) {
     fun observeItems(boardId: String): Flow<List<BoardItemEntity>> = dao.observeItems(boardId)
 
     suspend fun ensureDefaultBoard() {
-        if (dao.getBoards().isEmpty()) createBoard("我的画板")
+        if (dao.getBoards().isEmpty()) createBoard(tr("我的画板", "My board"))
     }
 
     suspend fun createBoard(name: String): BoardEntity {

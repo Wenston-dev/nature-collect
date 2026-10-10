@@ -12,6 +12,8 @@ import android.text.TextPaint
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.SpeciesGroup
+import io.github.wgd753.naturecollect.ui.Lang
+import io.github.wgd753.naturecollect.ui.tr
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -60,7 +62,7 @@ class PosterRenderer(private val media: MediaFiles) {
             color = MUTED
             textSize = 36f
         }
-        canvas.drawText("$species 种 · $total 次遇见 · ${day(System.currentTimeMillis())}", margin, 215f, subPaint)
+        canvas.drawText(tr("$species 种 · $total 次遇见 · ", "$species species · $total sightings · ") + day(System.currentTimeMillis()), margin, 215f, subPaint)
 
         // Category chips.
         val chipPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -74,7 +76,7 @@ class PosterRenderer(private val media: MediaFiles) {
         Category.entries.forEach { category ->
             val count = groups.count { it.category.key == category.key }
             if (count == 0) return@forEach
-            val text = "${category.emoji} ${category.label} $count"
+            val text = "${category.emoji} ${category.display} $count"
             val w = chipPaint.measureText(text) + 48f
             if (x + w > width - margin) {
                 x = margin
@@ -141,7 +143,7 @@ class PosterRenderer(private val media: MediaFiles) {
             textAlign = Paint.Align.CENTER
         }
         val more = groups.size - shown.size
-        val foot = if (more > 0) "还有 $more 种没放下 · 自然收集" else "自然收集 · 我的野外笔记"
+        val foot = if (more > 0) tr("还有 $more 种没放下 · 自然收集", "$more more not shown") else tr("自然收集 · 我的野外笔记", "My field notes")
         canvas.drawText(foot, width / 2f, height - 64f, footPaint)
         return bitmap
     }
@@ -168,7 +170,8 @@ class PosterRenderer(private val media: MediaFiles) {
         }
     }
 
-    private fun day(millis: Long) = SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(Date(millis))
+    private fun day(millis: Long) =
+        SimpleDateFormat(tr("yyyy年M月d日", "MMMM d, yyyy"), if (Lang.english) Locale.ENGLISH else Locale.CHINA).format(Date(millis))
 
     private fun tint(category: Category): Int = category.color.toInt()
 
