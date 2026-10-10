@@ -1,6 +1,8 @@
 package io.github.wgd753.naturecollect.ui.camera
 
 import android.Manifest
+import android.os.Build
+import android.widget.Toast
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -179,16 +181,31 @@ private fun LiveCamera(vm: CameraViewModel) {
                 add(Manifest.permission.ACCESS_FINE_LOCATION)
                 add(Manifest.permission.ACCESS_COARSE_LOCATION)
             }
+            if (!container.location.hasMediaLocationPermission() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(Manifest.permission.ACCESS_MEDIA_LOCATION)
+            }
         }
         if (wanted.isNotEmpty()) permissionLauncher.launch(wanted.toTypedArray())
     }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    // The document picker (unlike the photo picker) can hand over the original
+    // file with its GPS tags, so imported photos keep where and when they were taken.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
                 val (latLng, time) = withContext(Dispatchers.IO) { container.location.readExif(uri) }
-                if (bitmap != null) vm.onPhoto(bitmap, latLng, time) else vm.fail("这张图片打不开")
+                if (bitmap == null) {
+                    vm.fail("这张图片打不开")
+                } else {
+                    vm.onPhoto(bitmap, latLng, time, imported = true)
+                    val found = listOfNotNull(time?.let { "拍摄时间" }, latLng?.let { "地点" })
+                    Toast.makeText(
+                        context,
+                        if (found.isEmpty()) "这张照片里没有时间和位置信息" else "已从照片读取${found.joinToString("和")}",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             }
         }
     }
@@ -311,7 +328,7 @@ private fun LiveCamera(vm: CameraViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SideButton(Icons.Outlined.PhotoLibrary, "相册") {
-                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                picker.launch(arrayOf("image/*"))
             }
             ShutterButton(enabled = hasCamera) {
                 scope.launch {

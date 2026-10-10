@@ -43,15 +43,19 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
     private var latLng: DoubleArray? = null
     private var job: Job? = null
 
-    /** Starts the pipeline for a new photo. [exifLatLng] comes from imported photos. */
-    fun onPhoto(bitmap: Bitmap, exifLatLng: DoubleArray? = null, exifTime: Long? = null) {
+    /**
+     * Starts the pipeline for a new photo. Imported photos bring their own EXIF
+     * time and place; if they have no GPS we leave the place empty rather than
+     * stamping today's location on an old picture.
+     */
+    fun onPhoto(bitmap: Bitmap, exifLatLng: DoubleArray? = null, exifTime: Long? = null, imported: Boolean = false) {
         job?.cancel()
         photo = bitmap
         takenAt = exifTime ?: System.currentTimeMillis()
         latLng = exifLatLng
         _stage.value = CameraStage.Finding(bitmap)
         job = viewModelScope.launch {
-            val location = if (exifLatLng == null) async { container.location.current() } else null
+            val location = if (exifLatLng == null && !imported) async { container.location.current() } else null
             try {
                 val image = container.segmenter.encode(bitmap)
                 // Default prompt: whatever is in the middle of the frame.

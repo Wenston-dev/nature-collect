@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
+import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -46,15 +47,48 @@ class LocationHelper(private val context: Context) {
         return fresh ?: lastKnown
     }
 
-    /** GPS position and capture time stored in an imported photo, if any. */
-    fun readExif(uri: Uri): Pair<DoubleArray?, Long?> = runCatching {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-            val exif = ExifInterface(stream)
-            val latLong = exif.latLong
-            val time = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-                ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
-            val millis = time?.let { runCatching { SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).parse(it)?.time }.getOrNull() }
-            latLong to millis
+    /**
+     * GPS position and capture time stored in an imported photo, if any.
+     *
+     * Android hides photo locations from apps unless they hold
+     * ACCESS_MEDIA_LOCATION and explicitly ask for the original file, so try
+     * that first and fall back to the redacted copy (which still has the time).
+     */
+    fun readExif(uri: Uri): Pair<DoubleArray?, Long?> {
+        val candidates = buildList {
+            originalUri(uri)?.let(::add)
+            add(uri)
         }
-    }.getOrNull() ?: (null to null)
+        var time: Long? = null
+        for (candidate in candidates) {
+            val result = runCatching {
+                context.contentResolver.openInputStream(candidate)?.use { stream ->
+                    val exif = ExifInterface(stream)
+                    val raw = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+                        ?: exif.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED)
+                        ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
+                    val millis = raw?.let { runCatching { SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).parse(it)?.time }.getOrNull() }
+                    // A redacted location reads as 0,0; treat it as missing.
+                    val latLong = exif.latLong?.takeIf { it[0] != 0.0 || it[1] != 0.0 }
+                    latLong to millis
+                }
+            }.getOrNull() ?: continue
+            time = time ?: result.second
+            if (result.first != null) return result.first to time
+        }
+        return null to time
+    }
+
+    fun hasMediaLocationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_MEDIA_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    /** The un-redacted media URI for a picked photo, when the system will give it to us. */
+    private fun originalUri(uri: Uri): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !hasMediaLocationPermission()) return null
+        return runCatching {
+            val media = if (uri.authority == MediaStore.AUTHORITY) uri else MediaStore.getMediaUri(context, uri)
+            media?.let { MediaStore.setRequireOriginal(it) }
+        }.getOrNull()
+    }
 }

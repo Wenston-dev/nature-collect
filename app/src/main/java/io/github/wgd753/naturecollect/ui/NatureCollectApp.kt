@@ -37,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.categories.CategoriesScreen
+import io.github.wgd753.naturecollect.ui.onboarding.Onboarding
+import androidx.compose.runtime.collectAsState
 import io.github.wgd753.naturecollect.ui.theme.Forest
 import io.github.wgd753.naturecollect.ui.theme.ForestDeep
 import io.github.wgd753.naturecollect.ui.theme.Paper
@@ -103,6 +105,12 @@ fun NatureCollectApp() {
             restoreState = true
         }
     }
+
+    val container = rememberContainer()
+    val onboarded by container.settings.onboarded.collectAsState()
+    val apiKey by container.settings.apiKey.collectAsState()
+    // Existing users who already have a key skip the walkthrough.
+    if (!onboarded && apiKey == null) Onboarding(onDone = container.settings::setOnboarded)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,

@@ -112,6 +112,7 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDelete by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
+    val apiKey by container.settings.apiKey.collectAsState()
 
     val all = captures.orEmpty()
     val categories = Category.entries
@@ -194,6 +195,27 @@ fun CollectionScreen(onOpenCapture: (String) -> Unit, onOpenSettings: () -> Unit
         ) {
             item(key = "hero", span = { GridItemSpan(maxLineSpan) }) {
                 HeroCard(groups = groups, speciesCount = speciesCount, total = all.size, newThisMonth = newThisMonth)
+            }
+            if (apiKey == null) {
+                item(key = "nokey", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Sun.copy(alpha = 0.25f))
+                            .clickable(onClick = onOpenSettings)
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("🔑", fontSize = 20.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "还没填 DeepSeek API Key，拍到的东西不会自动识别。点这里去设置",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
             item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
                 Column {

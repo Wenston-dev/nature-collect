@@ -26,6 +26,23 @@ class Settings(context: Context) {
     private val _autoRecognize = MutableStateFlow(prefs.getBoolean(KEY_AUTO, true))
     val autoRecognize: StateFlow<Boolean> = _autoRecognize.asStateFlow()
 
+    /** Base map: "amap" (高德 tiles, fast in mainland China) or "osm" (OpenFreeMap). */
+    private val _mapSource = MutableStateFlow(prefs.getString(KEY_MAP, MAP_AMAP) ?: MAP_AMAP)
+    val mapSource: StateFlow<String> = _mapSource.asStateFlow()
+
+    fun setMapSource(value: String) {
+        prefs.edit().putString(KEY_MAP, value).apply()
+        _mapSource.value = value
+    }
+
+    private val _onboarded = MutableStateFlow(prefs.getBoolean(KEY_ONBOARDED, false))
+    val onboarded: StateFlow<Boolean> = _onboarded.asStateFlow()
+
+    fun setOnboarded() {
+        prefs.edit().putBoolean(KEY_ONBOARDED, true).apply()
+        _onboarded.value = true
+    }
+
     fun setApiKey(value: String?) {
         val trimmed = value?.trim().orEmpty()
         if (trimmed.isEmpty()) {
@@ -73,11 +90,15 @@ class Settings(context: Context) {
         return String(cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)))
     }
 
-    private companion object {
-        const val KEYSTORE = "AndroidKeyStore"
-        const val ALIAS = "deepseek_api_key"
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val KEY_API = "api_key"
-        const val KEY_AUTO = "auto_recognize"
+    companion object {
+        const val MAP_AMAP = "amap"
+        const val MAP_OSM = "osm"
+        private const val KEYSTORE = "AndroidKeyStore"
+        private const val ALIAS = "deepseek_api_key"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val KEY_API = "api_key"
+        private const val KEY_AUTO = "auto_recognize"
+        private const val KEY_MAP = "map_source"
+        private const val KEY_ONBOARDED = "onboarded"
     }
 }

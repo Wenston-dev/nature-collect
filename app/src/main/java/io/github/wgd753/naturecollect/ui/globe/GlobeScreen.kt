@@ -42,6 +42,11 @@ import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.data.Settings
+import io.github.wgd753.naturecollect.location.ChinaCoords
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import io.github.wgd753.naturecollect.ui.theme.Card
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -61,7 +66,22 @@ import org.maplibre.geojson.Point
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-private const val STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
+private const val OSM_STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
+
+/**
+ * 高德 raster tiles: no key, quick from mainland China. They are drawn in
+ * GCJ-02, so pins are shifted with [ChinaCoords] to line up.
+ */
+private val AMAP_STYLE = """
+    {"version":8,
+     "sources":{"base":{"type":"raster","tileSize":256,"maxzoom":18,"attribution":"© 高德地图",
+       "tiles":["https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"]}},
+     "layers":[{"id":"bg","type":"background","paint":{"background-color":"#EEF3EC"}},
+               {"id":"base","type":"raster","source":"base","paint":{"raster-saturation":-0.25}}]}
+""".trimIndent()
 private const val SOURCE_ID = "captures"
 private const val LAYER_ID = "captures-layer"
 
@@ -75,6 +95,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     var filter by rememberSaveable { mutableStateOf<Category?>(null) }
     val located = captures.filter { it.latitude != null && it.longitude != null }
     val shown = located.filter { filter == null || Category.fromKey(it.category).key == filter?.key }
+    val source by container.settings.mapSource.collectAsState()
+    val amap = source == Settings.MAP_AMAP
+    var loadFailed by remember { mutableStateOf(false) }
 
     val mapView = remember { MapView(context).apply { onCreate(null) } }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -112,7 +135,26 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 .target(LatLng(34.0, 108.0))
                 .zoom(3.0)
                 .build()
-            m.setStyle(Style.Builder().fromUri(STYLE_URL)) { loaded ->
+            m.addOnMapClickListener { point ->
+                val screen = m.projection.toScreenLocation(point)
+                val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
+                val id = hit?.getStringProperty("cid")
+                if (id != null) openCapture(id)
+                id != null
+            }
+        }
+        mapView.addOnDidFailLoadingMapListener { loadFailed = true }
+        mapView.addOnDidFinishLoadingMapListener { loadFailed = false }
+    }
+
+    // (Re)load the base map whenever the tile source changes.
+    LaunchedEffect(map, source) {
+        val m = map ?: return@LaunchedEffect
+        style = null
+        loadFailed = false
+        val builder = if (amap) Style.Builder().fromJson(AMAP_STYLE) else Style.Builder().fromUri(OSM_STYLE_URL)
+        run {
+            m.setStyle(builder) { loaded ->
                 loaded.addSource(GeoJsonSource(SOURCE_ID))
                 loaded.addLayer(
                     SymbolLayer(LAYER_ID, SOURCE_ID).withProperties(
@@ -132,13 +174,6 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 )
                 style = loaded
             }
-            m.addOnMapClickListener { point ->
-                val screen = m.projection.toScreenLocation(point)
-                val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
-                val id = hit?.getStringProperty("cid")
-                if (id != null) openCapture(id)
-                id != null
-            }
         }
     }
 
@@ -148,7 +183,8 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
         val icons = withContext(Dispatchers.IO) { shown.associate { it.id to markerBitmap(container.media, it) } }
         icons.forEach { (id, bitmap) -> if (bitmap != null && s.getImage(id) == null) s.addImage(id, bitmap) }
         val features = shown.filter { icons[it.id] != null }.map { capture ->
-            Feature.fromGeometry(Point.fromLngLat(capture.longitude!!, capture.latitude!!)).apply {
+            val (lat, lon) = displayCoords(capture, amap)
+            Feature.fromGeometry(Point.fromLngLat(lon, lat)).apply {
                 addStringProperty("icon", capture.id)
                 addStringProperty("cid", capture.id)
             }
@@ -159,7 +195,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     LaunchedEffect(map, style, recenter, filter) {
         val m = map ?: return@LaunchedEffect
         if (style == null) return@LaunchedEffect
-        fitTo(m, shown)
+        fitTo(m, shown, amap)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -169,6 +205,10 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+            Spacer(Modifier.width(8.dp))
+            FilterPill(if (amap) "高德" else "OSM", selected = true) {
+                container.settings.setMapSource(if (amap) Settings.MAP_OSM else Settings.MAP_AMAP)
+            }
         }
         CategoryFilterRow(selected = filter, onSelect = { filter = it })
         Box(
@@ -189,6 +229,18 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
             ) {
                 Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "看全部", tint = MaterialTheme.colorScheme.primary)
             }
+            if (loadFailed) {
+                Text(
+                    if (amap) "地图加载失败，请检查网络，或点右上角切换到 OSM" else "OSM 地图在国内可能连不上，点右上角切换到高德",
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Card)
+                        .padding(14.dp),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             if (located.isEmpty()) {
                 Text(
                     "带位置的收集会出现在这里\n拍照时允许定位就行",
@@ -205,8 +257,16 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     }
 }
 
-private fun fitTo(map: MapLibreMap, captures: List<CaptureEntity>) {
-    val points = captures.mapNotNull { c -> c.latitude?.let { LatLng(it, c.longitude!!) } }
+/** Where to draw a capture: shifted to GCJ-02 on 高德 tiles, raw GPS otherwise. */
+private fun displayCoords(capture: CaptureEntity, amap: Boolean): Pair<Double, Double> {
+    val lat = capture.latitude!!
+    val lon = capture.longitude!!
+    return if (amap) ChinaCoords.wgs84ToGcj02(lat, lon) else lat to lon
+}
+
+private fun fitTo(map: MapLibreMap, captures: List<CaptureEntity>, amap: Boolean) {
+    val points = captures.filter { it.latitude != null && it.longitude != null }
+        .map { c -> displayCoords(c, amap).let { (lat, lon) -> LatLng(lat, lon) } }
     when {
         points.isEmpty() -> Unit
         points.size == 1 -> map.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 14.0))
