@@ -24,7 +24,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ci-signing/release.keystore
-          key: signing-key-v2
+          # v3 saves a copy in main's own cache scope; the first run restores v2
+          # from the old default branch so the key itself never changes.
+          key: signing-key-v3
+          restore-keys: signing-key-v2
 
       - name: Create signing key if missing
         run: |
