@@ -37,8 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.MediaFiles
@@ -71,7 +69,6 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.Property
@@ -112,7 +109,7 @@ private const val LAYER_ID = "captures-layer"
  * sticker with others close by opens a sheet of everything found there.
  */
 @Composable
-fun GlobeScreen(onOpenCapture: (String) -> Unit) {
+fun GlobeScreen(mapHost: MapHost, onOpenCapture: (String) -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -122,11 +119,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     val shown = located.filter { filter == null || Category.fromKey(it.category).key == filter?.key }
     val source by container.settings.mapSource.collectAsState()
     val amap = source == Settings.MAP_AMAP
-    var loadFailed by remember { mutableStateOf(false) }
-
-    val mapView = remember { MapView(context).apply { onCreate(null) } }
-    var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    var style by remember { mutableStateOf<Style?>(null) }
+    val map = mapHost.map
+    val style = mapHost.style
+    val loadFailed = mapHost.loadFailed
     var recenter by remember { mutableIntStateOf(0) }
     var center by remember { mutableStateOf<LatLng?>(null) }
     val openCapture by rememberUpdatedState(onOpenCapture)
@@ -134,68 +129,47 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     // Ids of the finds around a tapped sticker, nearest first; null when the sheet is closed.
     var placeIds by remember { mutableStateOf<List<String>?>(null) }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStart()
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onResume()
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onPause()
-            mapView.onStop()
-            mapView.onDestroy()
-        }
+    DisposableEffect(lifecycleOwner, mapHost) {
+        val hide = mapHost.show(lifecycleOwner)
+        onDispose { hide() }
     }
 
-    LaunchedEffect(mapView) {
-        mapView.getMapAsync { m ->
-            map = m
-            m.uiSettings.isRotateGesturesEnabled = false
-            m.uiSettings.isCompassEnabled = false
-            m.uiSettings.isLogoEnabled = false
-            // Below this the 高德 raster has no tiles and the map looks empty.
-            m.setMinZoomPreference(3.0)
-            m.uiSettings.isAttributionEnabled = false
-            m.cameraPosition = org.maplibre.android.camera.CameraPosition.Builder()
-                .target(LatLng(34.0, 108.0))
-                .zoom(3.0)
-                .build()
-            m.addOnMapClickListener { point ->
-                val screen = m.projection.toScreenLocation(point)
-                val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
-                val id = hit?.getStringProperty("cid")
-                val anchor = id?.let { cid -> currentShown.firstOrNull { it.id == cid } }
-                if (anchor != null) {
-                    val near = nearbyCaptures(anchor, currentShown)
-                    if (near.size <= 1) {
-                        openCapture(anchor.id)
-                    } else {
-                        placeIds = near.map { it.id }
-                    }
-                } else if (id != null) {
-                    openCapture(id)
+    DisposableEffect(map) {
+        val m = map ?: return@DisposableEffect onDispose {}
+        val onClick = MapLibreMap.OnMapClickListener { point ->
+            val screen = m.projection.toScreenLocation(point)
+            val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
+            val id = hit?.getStringProperty("cid")
+            val anchor = id?.let { cid -> currentShown.firstOrNull { it.id == cid } }
+            if (anchor != null) {
+                val near = nearbyCaptures(anchor, currentShown)
+                if (near.size <= 1) {
+                    openCapture(anchor.id)
+                } else {
+                    placeIds = near.map { it.id }
                 }
-                id != null
+            } else if (id != null) {
+                openCapture(id)
             }
-            m.addOnCameraIdleListener { center = m.cameraPosition.target }
+            id != null
         }
-        mapView.addOnDidFailLoadingMapListener { loadFailed = true }
-        mapView.addOnDidFinishLoadingMapListener { loadFailed = false }
+        val onIdle = MapLibreMap.OnCameraIdleListener { center = m.cameraPosition.target }
+        m.addOnMapClickListener(onClick)
+        m.addOnCameraIdleListener(onIdle)
+        onDispose {
+            m.removeOnMapClickListener(onClick)
+            m.removeOnCameraIdleListener(onIdle)
+        }
     }
 
     // (Re)load the base map whenever the tile source changes.
     LaunchedEffect(map, source) {
         val m = map ?: return@LaunchedEffect
-        style = null
-        loadFailed = false
+        // Coming back to the tab: the map still has this source's style and stickers.
+        if (mapHost.styleSource == source && mapHost.style != null) return@LaunchedEffect
+        mapHost.style = null
+        mapHost.styleSource = source
+        mapHost.loadFailed = false
         val builder = if (amap) Style.Builder().fromJson(AMAP_STYLE) else Style.Builder().fromUri(OSM_STYLE_URL)
         run {
             m.setStyle(builder) { loaded ->
@@ -220,7 +194,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                         ),
                     ),
                 )
-                style = loaded
+                if (mapHost.styleSource == source) mapHost.style = loaded
             }
         }
     }
@@ -275,7 +249,7 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 .padding(6.dp)
                 .background(Celadon),
         ) {
-            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+            AndroidView(factory = { mapHost.takeView() }, modifier = Modifier.fillMaxSize())
             center?.let { c ->
                 val (lat, lon) = if (amap) gcjToWgsApprox(c.latitude, c.longitude) else c.latitude to c.longitude
                 Text(

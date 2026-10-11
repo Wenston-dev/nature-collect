@@ -74,6 +74,7 @@ import io.github.wgd753.naturecollect.ui.camera.CameraScreen
 import io.github.wgd753.naturecollect.ui.collection.CollectionScreen
 import io.github.wgd753.naturecollect.ui.detail.CaptureDetailScreen
 import io.github.wgd753.naturecollect.ui.globe.GlobeScreen
+import io.github.wgd753.naturecollect.ui.globe.rememberMapHost
 import io.github.wgd753.naturecollect.ui.settings.SettingsScreen
 
 private const val SETTINGS_ROUTE = "settings"
@@ -114,6 +115,7 @@ fun NatureCollectApp() {
     }
 
     val container = rememberContainer()
+    val mapHost = rememberMapHost()
     val onboarded by container.settings.onboarded.collectAsState()
     val apiKey by container.settings.apiKey.collectAsState()
     // Existing users who already have a key skip the walkthrough.
@@ -146,7 +148,7 @@ fun NatureCollectApp() {
             composable(Tab.Board.route) { BoardScreen() }
             composable(Tab.Camera.route) { CameraScreen(onOpenCapture = openCapture) }
             composable(Tab.Calendar.route) { CalendarScreen(onOpenCapture = openCapture) }
-            composable(Tab.Globe.route) { GlobeScreen(onOpenCapture = openCapture) }
+            composable(Tab.Globe.route) { GlobeScreen(mapHost, onOpenCapture = openCapture) }
             composable(Tab.Collection.route) {
                 CollectionScreen(
                     onOpenCapture = openCapture,
