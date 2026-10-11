@@ -2,7 +2,7 @@
 
 成片：`out/shiye_promo.mp4`，封面候选：`out/cover.jpg`。
 
-竖版 1080×1920、44.5 秒的小红书宣传片。画面是照着 App 代码（标本风）用 HTML/CSS 复刻的界面，逐帧截图后用 ffmpeg 合成。照片都是 Wikimedia Commons 上的真实照片，没有 AI 生成，作者和授权见 `credits.txt`。
+竖版 1080×1920、43.1 秒的小红书宣传片。画面是照着 App 代码（标本风）用 HTML/CSS 复刻的界面，逐帧截图后用 ffmpeg 合成。照片都是 Wikimedia Commons 上的真实照片，没有 AI 生成，作者和授权见 `credits.txt`。
 
 ## 重新渲染
 
@@ -11,7 +11,7 @@
 ```bash
 ./fonts.sh                                           # 下载字体到 site/fonts
 node render.mjs still 9.4,21                         # 截几帧到 work/still_*.png 预览
-node render.mjs video out/shiye_promo.mp4 30 0 44.5  # 渲染整片
+node render.mjs video out/shiye_promo.mp4 30 1.4 44.5  # 渲染整片（从 1.4 秒开始，直接以麻雀开场）
 ```
 
 （`render.mjs` 会把截图写到 `work/`，把视频写到 `out/`，需要先建好这两个目录。）
@@ -37,5 +37,5 @@ node render.mjs video out/shiye_promo.mp4 30 0 44.5  # 渲染整片
 
 ```bash
 ffmpeg -ss 36 -t 44.5 -i audio/bright.ogg -i audio/sfx.wav -filter_complex "[0:a]aresample=48000,loudnorm=I=-20:TP=-3,afade=t=in:d=0.4,afade=t=out:st=42.0:d=2.5,volume=0.85[m];[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=0.9[s];[m][s]amix=inputs=2:normalize=0,loudnorm=I=-15:TP=-1.5[a]" -map "[a]" audio/mix.wav
-ffmpeg -i out/shiye_promo.mp4 -i audio/mix.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest out/with_audio.mp4
+ffmpeg -i out/shiye_promo.mp4 -i audio/mix.wav -map 0:v -map 1:a -c:v copy  # 配音轨时对 mix.wav 加 -ss 1.4 对齐 -c:a aac -b:a 192k -shortest out/with_audio.mp4
 ```

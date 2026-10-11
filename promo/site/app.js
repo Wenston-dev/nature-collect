@@ -419,6 +419,7 @@ const SCR = ['sLive', 'sFind', 'sStick', 'sSaved', 'sColl', 'sDetail', 'sMap', '
 function show(map) { SCR.forEach((id) => { const o = map[id] || 0; const e = $(id); e.style.opacity = o; e.style.display = o > 0 ? 'block' : 'none'; }); }
 function xfade(t, t0, d = 0.25) { return seg(t, t0, t0 + d); }
 
+window.START = 1.4; // the first 1.4 s (old landscape opener) are skipped
 window.render = function render(t) {
   // ---- hook ----
   const hook = $('hook');
@@ -426,14 +427,15 @@ window.render = function render(t) {
     hook.style.display = 'block';
     const zA = 1.10 - 0.08 * seg(t, 0, 2.0);
     css($('hookA'), { transform: `scale(${zA})` });
-    const bIn = seg(t, 1.55, 1.95);
-    css($('hookB'), { opacity: bIn, transform: `scale(${1.06 - 0.04 * seg(t, 1.55, 3.0)})` });
-    css($('hookCap1'), { opacity: seg(t, 0.25, 0.6) * (1 - seg(t, 1.45, 1.7)), transform: `translateY(${20 * (1 - EIO(seg(t, 0.25, 0.6)))}px)` });
-    css($('hookCap2'), { opacity: seg(t, 1.85, 2.2) * (1 - seg(t, 2.85, 3.05)), transform: `translateY(${20 * (1 - EIO(seg(t, 1.85, 2.2)))}px)` });
+    const bIn = 1; // opens on the sparrow (render starts at START)
+    css($('hookB'), { opacity: bIn, transform: `scale(${1.06 - 0.04 * seg(t, 1.4, 3.0)})` });
+    css($('hookCap1'), { opacity: 0 });
+    css($('hookCap2'), { opacity: 1 - seg(t, 2.85, 3.05) });
     $('hookShade').style.opacity = 1 - seg(t, 2.9, 3.2);
     const m = FOS(seg(t, 3.0, 3.7));
     const R = { x: 198 + 12 * 1.9, y: 352 + 66 * 1.9, w: 336 * 1.9, h: 493.5 * 1.9 };
     css(hook, { left: lerp(0, R.x, m) + 'px', top: lerp(0, R.y, m) + 'px', width: lerp(1080, R.w, m) + 'px', height: lerp(1920, R.h, m) + 'px', borderRadius: lerp(0, 4, m) + 'px' });
+    css($('hookB'), { backgroundPosition: `${lerp(40, 57, m)}% 50%` });
     if (m > 0) css($('hookB'), { transform: `scale(${lerp(1.02, 1.0, m)})` });
     hook.style.opacity = t > 3.6 ? 1 - seg(t, 3.6, 3.75) : 1;
   } else hook.style.display = 'none';
