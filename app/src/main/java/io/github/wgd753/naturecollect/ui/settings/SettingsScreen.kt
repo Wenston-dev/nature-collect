@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -273,6 +275,17 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = Soft,
                 )
+                val uriHandler = LocalUriHandler.current
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { uriHandler.openUri(REPO_URL) }
+                        .padding(vertical = 4.dp),
+                ) {
+                    Text(tr("开源仓库", "Source code"), style = MaterialTheme.typography.bodyMedium, color = Soft, modifier = Modifier.weight(1f))
+                    Text(REPO_URL.removePrefix("https://"), style = MonoStyle, color = Pine)
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -294,6 +307,8 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         content()
     }
 }
+
+private const val REPO_URL = "https://github.com/Wenston-dev/nature-collect"
 
 private val SquareButton = RoundedCornerShape(2.dp)
 
