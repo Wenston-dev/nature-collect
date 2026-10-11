@@ -33,16 +33,20 @@ class SamImage internal constructor(
     /** The image scaled so its longest side is [SamSegmenter.INPUT_SIZE]. */
     val bitmap: Bitmap,
     internal val embedding: FloatArray,
+    /** The decoder's two high-resolution feature maps, [1, 32, 256, 256] and [1, 64, 128, 128]. */
+    internal val highRes0: FloatArray,
+    internal val highRes1: FloatArray,
 )
 
 /**
- * MobileSAM on ONNX Runtime. The image encoder runs once per photo (the slow
- * part); each tap then only runs the small prompt decoder.
+ * EdgeTAM (an on-device SAM 2) on ONNX Runtime. The image encoder runs once per
+ * photo (the slow part); each tap then only runs the small prompt decoder.
  *
- * The models are exported by tools/export_mobilesam_onnx.py: the encoder takes
- * a normalised, zero-padded [1, 3, 1024, 1024] tensor and returns
- * [1, 256, 64, 64] embeddings; the decoder is SAM's standard ONNX decoder
- * returning all four candidate masks with their predicted scores.
+ * The models are exported by tools/export_edgetam_onnx.py: the encoder takes
+ * the photo stretched to a normalised [1, 3, 1024, 1024] tensor and returns
+ * [1, 256, 64, 64] embeddings plus two high-resolution feature maps; the
+ * decoder takes SAM's usual prompts in image pixels and returns all four
+ * candidate masks with their predicted scores.
  */
 class SamSegmenter(private val context: Context) {
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
@@ -76,7 +80,7 @@ class SamSegmenter(private val context: Context) {
         return env.createSession(file.path, options)
     }
 
-    /** Runs the image encoder. Takes about a second or two on a recent phone. */
+    /** Runs the image encoder. Takes well under a second on a recent phone. */
     suspend fun encode(source: Bitmap): SamImage = withContext(Dispatchers.Default) {
         val (enc, _) = sessions()
         val scale = INPUT_SIZE.toFloat() / max(source.width, source.height)
@@ -84,32 +88,32 @@ class SamSegmenter(private val context: Context) {
         val h = (source.height * scale).roundToInt().coerceIn(1, INPUT_SIZE)
         val scaled = Bitmap.createScaledBitmap(source, w, h, true).copy(Bitmap.Config.ARGB_8888, false)
 
-        val pixels = IntArray(w * h)
-        scaled.getPixels(pixels, 0, w, 0, 0, w, h)
+        // SAM 2 stretches the image to a square rather than padding it.
+        val square = Bitmap.createScaledBitmap(source, INPUT_SIZE, INPUT_SIZE, true).copy(Bitmap.Config.ARGB_8888, false)
         val plane = INPUT_SIZE * INPUT_SIZE
-        // Padding stays 0, matching SAM's normalise-then-pad preprocessing.
+        val pixels = IntArray(plane)
+        square.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+        square.recycle()
         val input = FloatArray(3 * plane)
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val p = pixels[y * w + x]
-                val i = y * INPUT_SIZE + x
-                input[i] = (((p shr 16) and 0xFF) - MEAN[0]) / STD[0]
-                input[plane + i] = (((p shr 8) and 0xFF) - MEAN[1]) / STD[1]
-                input[2 * plane + i] = ((p and 0xFF) - MEAN[2]) / STD[2]
-            }
+        for (i in 0 until plane) {
+            val p = pixels[i]
+            input[i] = (((p shr 16) and 0xFF) - MEAN[0]) / STD[0]
+            input[plane + i] = (((p shr 8) and 0xFF) - MEAN[1]) / STD[1]
+            input[2 * plane + i] = ((p and 0xFF) - MEAN[2]) / STD[2]
         }
-        val embedding = OnnxTensor.createTensor(
+        OnnxTensor.createTensor(
             env,
             FloatBuffer.wrap(input),
             longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong()),
         ).use { tensor ->
             enc.run(mapOf(ENCODER_INPUT to tensor)).use { result ->
-                val out = result[0] as OnnxTensor
-                val buffer = out.floatBuffer
-                FloatArray(buffer.remaining()).also { buffer.get(it) }
+                fun output(name: String): FloatArray {
+                    val buffer = (result[name].get() as OnnxTensor).floatBuffer
+                    return FloatArray(buffer.remaining()).also { buffer.get(it) }
+                }
+                SamImage(scaled, output("image_embeddings"), output("high_res_feats_0"), output("high_res_feats_1"))
             }
         }
-        SamImage(scaled, embedding)
     }
 
     /** Shorthand for a tap prompt. */
@@ -176,6 +180,8 @@ class SamSegmenter(private val context: Context) {
 
         val inputs = mapOf(
             "image_embeddings" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.embedding), longArrayOf(1, 256, 64, 64)),
+            "high_res_feats_0" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.highRes0), longArrayOf(1, 32, 256, 256)),
+            "high_res_feats_1" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.highRes1), longArrayOf(1, 64, 128, 128)),
             "point_coords" to OnnxTensor.createTensor(env, FloatBuffer.wrap(coords), longArrayOf(1, n.toLong(), 2)),
             "point_labels" to OnnxTensor.createTensor(env, FloatBuffer.wrap(labels), longArrayOf(1, n.toLong())),
             "mask_input" to OnnxTensor.createTensor(env, FloatBuffer.wrap(FloatArray(256 * 256)), longArrayOf(1, 1, 256, 256)),
@@ -295,8 +301,8 @@ class SamSegmenter(private val context: Context) {
 
         /** Eraser brush width as a fraction of the image's longer side. */
         const val ERASER_WIDTH = 0.045f
-        private const val ENCODER_ASSET = "sam/mobile_sam_encoder.onnx"
-        private const val DECODER_ASSET = "sam/mobile_sam_decoder.onnx"
+        private const val ENCODER_ASSET = "sam/edgetam_encoder.onnx"
+        private const val DECODER_ASSET = "sam/edgetam_decoder.onnx"
         private const val ENCODER_INPUT = "image"
         private val MEAN = floatArrayOf(123.675f, 116.28f, 103.53f)
         private val STD = floatArrayOf(58.395f, 57.12f, 57.375f)

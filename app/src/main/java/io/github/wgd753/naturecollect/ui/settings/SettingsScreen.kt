@@ -267,8 +267,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 }
                 Text(
                     tr(
-                        "抠图：MobileSAM（在手机本地运行，不上传照片）\n识别：DeepSeek V4.1 Flash（只上传抠好的贴纸）\n地图：MapLibre + OpenFreeMap（OpenStreetMap 数据）",
-                        "Cutout: MobileSAM (runs on device, photos stay local)\nIdentification: DeepSeek V4.1 Flash (only the sticker is uploaded)\nMap: MapLibre + OpenFreeMap (OpenStreetMap data)",
+                        "抠图：EdgeTAM（在手机本地运行，不上传照片）\n识别：DeepSeek V4.1 Flash（只上传抠好的贴纸）\n地图：MapLibre + OpenFreeMap（OpenStreetMap 数据）",
+                        "Cutout: EdgeTAM (runs on device, photos stay local)\nIdentification: DeepSeek V4.1 Flash (only the sticker is uploaded)\nMap: MapLibre + OpenFreeMap (OpenStreetMap data)",
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Soft,

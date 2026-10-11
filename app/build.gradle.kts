@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.wgd753.naturecollect"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.7.1"
+        versionCode = 11
+        versionName = "0.8.0"
 
         ndk {
             // Phones from the last several years are all 64-bit ARM; dropping the
@@ -51,7 +51,7 @@ android {
         compose = true
     }
     androidResources {
-        // The SAM models are memory-mapped by ONNX Runtime; keep them uncompressed.
+        // The segmentation models are memory-mapped by ONNX Runtime; keep them uncompressed.
         noCompress += "onnx"
     }
 }
