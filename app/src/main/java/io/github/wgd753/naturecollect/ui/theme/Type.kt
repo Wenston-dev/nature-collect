@@ -21,9 +21,9 @@ val MonoFont = FontFamily(
 )
 
 val NatureTypography = Typography(
-    displaySmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 28.sp, letterSpacing = 6.sp),
-    headlineSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 22.sp, letterSpacing = 5.sp),
-    titleLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 18.sp, letterSpacing = 3.sp),
+    displaySmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 26.sp, letterSpacing = 1.sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 22.sp, letterSpacing = 1.sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 17.sp, letterSpacing = 0.5.sp),
     titleMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 15.sp),
     bodyLarge = TextStyle(fontSize = 16.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
@@ -37,6 +37,5 @@ val MonoStyle = TextStyle(fontFamily = MonoFont, fontSize = 11.sp, letterSpacing
 /** Older name for [MonoStyle]. */
 val LatinStyle = MonoStyle
 
-/** "图鉴" -> "图 鉴": the wide-tracked title look, for CJK only. */
-fun spaced(text: String): String =
-    if (text.any { it.code > 0x2E80 }) text.toList().joinToString(" ") else text
+/** Kept for older call sites; titles rely on letterSpacing alone now. */
+fun spaced(text: String): String = text

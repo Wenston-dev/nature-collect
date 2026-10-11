@@ -145,7 +145,6 @@ import io.github.wgd753.naturecollect.ui.DateStamp
 import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.paperGrain
 import io.github.wgd753.naturecollect.ui.specimenCard
-import io.github.wgd753.naturecollect.ui.tapedCorners
 import io.github.wgd753.naturecollect.data.speciesKey
 import io.github.wgd753.naturecollect.ui.theme.Night
 import kotlinx.coroutines.Dispatchers
@@ -809,7 +808,6 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                 Modifier
                     .fillMaxWidth()
                     .specimenCard()
-                    .tapedCorners(captureId.hashCode())
                     .padding(horizontal = 18.dp, vertical = 18.dp),
             ) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -833,7 +831,8 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                         SavedLabelBody(capture, speciesNumber, allCaptures)
                     }
                 }
-                capture?.let { c ->
+                val showStamp = io.github.wgd753.naturecollect.data.Settings.showStamp(androidx.compose.ui.platform.LocalContext.current)
+                capture?.takeIf { showStamp }?.let { c ->
                     DateStamp(c.createdAt, Modifier.align(Alignment.TopEnd), size = 60.dp)
                 }
             }
@@ -889,7 +888,7 @@ private fun SavedLabelBody(
             Text(
                 c.displayName,
                 modifier = Modifier.padding(top = 2.dp),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, letterSpacing = 2.4.sp),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, letterSpacing = 1.sp),
                 color = Pine,
             )
             c.nameSci?.let {

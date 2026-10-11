@@ -62,8 +62,8 @@ fun AchievementsScreen(onBack: () -> Unit) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Pine)
             }
             Text(
-                spaced(tr("成就", "Achievements")),
-                style = MaterialTheme.typography.titleLarge,
+                tr("成就", "Achievements"),
+                style = MaterialTheme.typography.headlineSmall,
                 color = Pine,
                 modifier = Modifier.weight(1f),
             )

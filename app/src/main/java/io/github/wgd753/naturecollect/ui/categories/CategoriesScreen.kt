@@ -99,7 +99,7 @@ fun CategoriesScreen(onBack: () -> Unit) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Pine)
             }
-            Text(spaced(tr("分类管理", "Categories")), style = MaterialTheme.typography.titleLarge, color = Pine, modifier = Modifier.weight(1f))
+            Text(tr("分类管理", "Categories"), style = MaterialTheme.typography.headlineSmall, color = Pine, modifier = Modifier.weight(1f))
             TextButton(onClick = { confirmReset = true }) { Text(tr("恢复默认", "Reset"), color = Soft) }
         }
         // Long-press a row and drag to reorder; the new order is saved on release.

@@ -23,7 +23,7 @@ import kotlin.math.min
  * grid of specimen cards (taped sticker, name and catalogue number), ready to
  * share or print.
  */
-class PosterRenderer(private val media: MediaFiles, private val mono: Typeface? = null) {
+class PosterRenderer(private val media: MediaFiles, private val mono: Typeface? = null, private val stamp: Boolean = true) {
 
     fun render(groups: List<SpeciesGroup>, title: String): Bitmap {
         val width = 1080
@@ -80,10 +80,10 @@ class PosterRenderer(private val media: MediaFiles, private val mono: Typeface? 
             color = SpecimenCanvas.PINE
             textSize = 72f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            letterSpacing = 0.18f
+            letterSpacing = 0.04f
         }
         canvas.drawText(SpecimenCanvas.ellipsize(spaced(title), titlePaint, width - margin * 2 - 200f), margin, 150f, titlePaint)
-        SpecimenCanvas.dateStamp(canvas, width - margin - 76f, 118f, 70f, System.currentTimeMillis(), monoFace)
+        if (stamp) SpecimenCanvas.dateStamp(canvas, width - margin - 76f, 118f, 70f, System.currentTimeMillis(), monoFace)
 
         // Stats strip between two hairlines.
         val total = groups.sumOf { it.captures.size }
@@ -159,7 +159,6 @@ class PosterRenderer(private val media: MediaFiles, private val mono: Typeface? 
                 SpecimenCanvas.sticker(canvas, sticker, RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), rotation = ((group.key.hashCode() % 7) - 3) * 1.5f)
                 sticker.recycle()
             }
-            SpecimenCanvas.tapedCorners(canvas, card, group.key.hashCode(), cell * 0.26f, cell * 0.09f)
 
             // Label row under a hairline: name left, "No.004 · ×5" right.
             val ruleY = cardTop + cell
@@ -184,7 +183,7 @@ class PosterRenderer(private val media: MediaFiles, private val mono: Typeface? 
         val more = groups.size - shown.size
         val foot = if (more > 0) tr("还有 $more 种没放下 · 拾野", "$more more not shown · Shiye") else tr("拾野 · 我的野外笔记", "Shiye · My field notes")
         canvas.drawText(foot, margin, height - 64f, footPaint)
-        SpecimenCanvas.stamp(canvas, width - margin - 50f, height - 76f, 46f, listOf("拾野", "采集"), monoFace)
+        if (stamp) SpecimenCanvas.stamp(canvas, width - margin - 50f, height - 76f, 46f, listOf("拾野", "采集"), monoFace)
         return bitmap
     }
 

@@ -97,6 +97,15 @@ class Settings(context: Context) {
         }
     }
 
+    /** The round "拾野" stamp on detail sheets, boards and exported images. */
+    private val _showStamp = MutableStateFlow(prefs.getBoolean(KEY_STAMP, true))
+    val showStamp: StateFlow<Boolean> = _showStamp.asStateFlow()
+
+    fun setShowStamp(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_STAMP, enabled).apply()
+        _showStamp.value = enabled
+    }
+
     fun setAutoRecognize(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO, enabled).apply()
         _autoRecognize.value = enabled
@@ -148,6 +157,11 @@ class Settings(context: Context) {
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val KEY_API = "api_key"
         private const val KEY_AUTO = "auto_recognize"
+        const val KEY_STAMP = "show_stamp"
+
+        /** For export code that only has a Context. */
+        fun showStamp(context: Context): Boolean =
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean(KEY_STAMP, true)
         private const val KEY_MAP = "map_source"
         private const val KEY_ONBOARDED = "onboarded"
     }

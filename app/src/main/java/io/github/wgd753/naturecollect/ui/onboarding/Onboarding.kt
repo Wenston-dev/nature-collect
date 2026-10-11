@@ -199,7 +199,7 @@ private fun WideButton(text: String, enabled: Boolean = true, onClick: () -> Uni
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Card, style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 2.sp))
+        Text(text, color = Card, style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp))
     }
 }
 

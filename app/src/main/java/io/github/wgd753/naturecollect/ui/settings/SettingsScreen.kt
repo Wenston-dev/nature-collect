@@ -215,6 +215,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 }
             }
 
+            Section(tr("水印", "Stamp")) {
+                val stamp by container.settings.showStamp.collectAsState()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterPill(tr("显示", "Show"), selected = stamp) { container.settings.setShowStamp(true) }
+                    FilterPill(tr("不显示", "Hide"), selected = !stamp) { container.settings.setShowStamp(false) }
+                }
+            }
+
             Section(tr("语言", "Language")) {
                 val language by container.settings.language.collectAsState()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

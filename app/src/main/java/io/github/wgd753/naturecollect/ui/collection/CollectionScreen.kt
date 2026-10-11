@@ -88,7 +88,6 @@ import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.achievements.achievementSummary
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.specimenCard
-import io.github.wgd753.naturecollect.ui.tapedCorners
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.Divider
 import io.github.wgd753.naturecollect.ui.theme.MonoFont
@@ -151,7 +150,7 @@ fun CollectionScreen(
             val title = filter?.let { tr("我的${it.display}图鉴", "My ${it.display}") } ?: tr("我的自然图鉴", "My nature collection")
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val poster = PosterRenderer(container.media, io.github.wgd753.naturecollect.export.SpecimenCanvas.monoTypeface(context)).render(shown, title)
+                    val poster = PosterRenderer(container.media, io.github.wgd753.naturecollect.export.SpecimenCanvas.monoTypeface(context), io.github.wgd753.naturecollect.data.Settings.showStamp(context)).render(shown, title)
                     try {
                         Gallery.save(context, poster, tr("图鉴", "collection"), jpeg = true)
                     } finally {
@@ -406,7 +405,6 @@ private fun SpeciesCell(
             }
             .specimenCard()
             .then(if (selected) Modifier.border(1.5.dp, Pine) else Modifier)
-            .tapedCorners(seed = group.key.hashCode())
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {

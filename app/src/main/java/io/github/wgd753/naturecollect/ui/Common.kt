@@ -77,7 +77,7 @@ fun PageHeader(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
@@ -225,7 +225,7 @@ fun PillButton(text: String, primary: Boolean = false, enabled: Boolean = true, 
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f },
         color = if (primary) Card else MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 2.sp),
+        style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp),
     )
 }
 

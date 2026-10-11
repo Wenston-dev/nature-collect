@@ -93,7 +93,6 @@ import androidx.compose.ui.text.font.FontWeight
 import io.github.wgd753.naturecollect.export.SpecimenCanvas
 import io.github.wgd753.naturecollect.ui.DateStamp
 import io.github.wgd753.naturecollect.ui.Hairline
-import io.github.wgd753.naturecollect.ui.TapeStrip
 import io.github.wgd753.naturecollect.ui.specimenCard
 import io.github.wgd753.naturecollect.ui.theme.Divider
 import io.github.wgd753.naturecollect.ui.theme.LabelBorder
@@ -122,6 +121,7 @@ fun CaptureDetailScreen(
     var editingDescription by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val all by container.captures.observeAll().collectAsState(initial = emptyList())
+    val showStamp by container.settings.showStamp.collectAsState()
 
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -326,11 +326,7 @@ fun CaptureDetailScreen(
                             }
                         }
                     }
-                    if (!showPhoto) {
-                        TapeStrip(Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 40.dp), angle = -30f)
-                        TapeStrip(Modifier.align(Alignment.TopEnd).padding(end = 84.dp, top = 32.dp), angle = 24f)
-                    }
-                    DateStamp(c.createdAt, Modifier.align(Alignment.TopEnd), size = 62.dp)
+                    if (showStamp) DateStamp(c.createdAt, Modifier.align(Alignment.TopEnd), size = 62.dp)
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
@@ -547,7 +543,7 @@ private fun HerbariumLabel(
                 name,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Medium,
-                letterSpacing = 2.4.sp,
+                letterSpacing = 1.sp,
                 lineHeight = 26.sp,
                 color = Pine,
                 modifier = Modifier.weight(1f, fill = false),

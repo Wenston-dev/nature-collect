@@ -160,7 +160,6 @@ import io.github.wgd753.naturecollect.ui.theme.Pine
 import io.github.wgd753.naturecollect.ui.theme.Rust
 import io.github.wgd753.naturecollect.ui.theme.Soft
 import io.github.wgd753.naturecollect.ui.theme.spaced
-import io.github.wgd753.naturecollect.ui.TapeStrip
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.draw.rotate
@@ -248,6 +247,7 @@ private fun BoardEditor(
     var showTextDialog by remember { mutableStateOf(false) }
     var importPhoto by remember { mutableStateOf<Bitmap?>(null) }
     val exportLayer = rememberGraphicsLayer()
+    val showStamp by container.settings.showStamp.collectAsState()
     val selectedItem = items.firstOrNull { it.id == selectedItemId }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -320,7 +320,7 @@ private fun BoardEditor(
                         .pointerInput(board.id) { detectTapGestures { selectedItemId = null } },
                 )
                 // Small rust maker's stamp; part of the sheet, so it is saved with the image too.
-                CollectStamp(Modifier.align(Alignment.BottomEnd).padding(12.dp))
+                if (showStamp) CollectStamp(Modifier.align(Alignment.BottomEnd).padding(12.dp))
                 items.filter { it.type == BoardItemType.DRAWING }.forEach { drawing ->
                     DrawingItem(drawing, widthPx, heightPx)
                 }
@@ -643,7 +643,6 @@ private fun TransformableItem(
         else -> 0.5f
     }
     val widthDp = with(density) { baseWidthPx.toDp() }
-    val tapeAngle = remember(item.id) { Random(item.id.hashCode()).nextFloat() * 24f - 12f }
 
     Box(
         Modifier
@@ -701,7 +700,6 @@ private fun TransformableItem(
         }
         when (item.type) {
             BoardItemType.STICKER -> {
-                // Held on the sheet by a strip of linen tape across the top.
                 Box(contentAlignment = Alignment.TopCenter) {
                     StickerImage(
                         capture!!,
@@ -710,7 +708,6 @@ private fun TransformableItem(
                             .height(widthDp * aspect)
                             .then(outline),
                     )
-                    TapeStrip(Modifier.offset(y = (-4).dp), angle = tapeAngle)
                 }
             }
             BoardItemType.TEXT -> Text(
@@ -730,7 +727,6 @@ private fun TransformableItem(
                         .height(widthDp * aspect)
                         .then(outline),
                 )
-                TapeStrip(Modifier.offset(y = (-4).dp), angle = tapeAngle)
             }
             BoardItemType.DRAWING -> Unit
         }

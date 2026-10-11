@@ -61,9 +61,7 @@ import io.github.wgd753.naturecollect.ui.theme.Soft
 import io.github.wgd753.naturecollect.ui.theme.Water
 import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.specimenCard
-import io.github.wgd753.naturecollect.data.speciesKey
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.content.res.ResourcesCompat
 import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -76,6 +74,7 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -108,7 +107,10 @@ private val AMAP_STYLE = """
 private const val SOURCE_ID = "captures"
 private const val LAYER_ID = "captures-layer"
 
-/** Finds pinned where they were found: small numbered rust-ringed pins on a celadon base map. */
+/**
+ * Stickers pinned where they were found on a celadon base map. Tapping a
+ * sticker with others close by opens a sheet of everything found there.
+ */
 @Composable
 fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     val container = rememberContainer()
@@ -128,6 +130,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
     var recenter by remember { mutableIntStateOf(0) }
     var center by remember { mutableStateOf<LatLng?>(null) }
     val openCapture by rememberUpdatedState(onOpenCapture)
+    val currentShown by rememberUpdatedState(shown)
+    // Ids of the finds around a tapped sticker, nearest first; null when the sheet is closed.
+    var placeIds by remember { mutableStateOf<List<String>?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -167,7 +172,17 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 val screen = m.projection.toScreenLocation(point)
                 val hit = m.queryRenderedFeatures(screen, LAYER_ID).firstOrNull()
                 val id = hit?.getStringProperty("cid")
-                if (id != null) openCapture(id)
+                val anchor = id?.let { cid -> currentShown.firstOrNull { it.id == cid } }
+                if (anchor != null) {
+                    val near = nearbyCaptures(anchor, currentShown)
+                    if (near.size <= 1) {
+                        openCapture(anchor.id)
+                    } else {
+                        placeIds = near.map { it.id }
+                    }
+                } else if (id != null) {
+                    openCapture(id)
+                }
                 id != null
             }
             m.addOnCameraIdleListener { center = m.cameraPosition.target }
@@ -191,12 +206,16 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                         PropertyFactory.iconImage(Expression.get("icon")),
                         PropertyFactory.iconAllowOverlap(true),
                         PropertyFactory.iconIgnorePlacement(true),
+                        // Stacked stickers: newest on top, in a stable order.
+                        PropertyFactory.symbolSortKey(Expression.get("order")),
+                        PropertyFactory.symbolZOrder(Property.SYMBOL_Z_ORDER_SOURCE),
                         PropertyFactory.iconSize(
                             Expression.interpolate(
                                 Expression.linear(),
                                 Expression.zoom(),
-                                Expression.stop(2, 0.8f),
-                                Expression.stop(12, 1.0f),
+                                Expression.stop(3, 0.6f),
+                                Expression.stop(10, 0.8f),
+                                Expression.stop(15, 1.0f),
                             ),
                         ),
                     ),
@@ -206,25 +225,25 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
         }
     }
 
-    // Each species' catalogue number: its place in the collection by first sighting.
-    val numbers = remember(captures) { speciesNumbers(captures) }
-
-    // Push the pins into the map whenever the data or filter changes.
-    LaunchedEffect(style, shown, numbers) {
+    // Push the stickers into the map whenever the data or filter changes.
+    LaunchedEffect(style, shown) {
         val s = style ?: return@LaunchedEffect
-        val pinIds = shown.associate { it.id to pinId(numbers[speciesKey(it)]) }
-        val missing = pinIds.values.distinct().filter { s.getImage(it) == null }
         val density = context.resources.displayMetrics.density
-        val mono = withContext(Dispatchers.IO) {
-            runCatching { ResourcesCompat.getFont(context, R.font.dm_mono) }.getOrNull() ?: android.graphics.Typeface.MONOSPACE
+        val ordered = shown.sortedBy { it.createdAt }
+        val iconIds = ordered.associate { it.id to stickerIconId(it) }
+        val missing = ordered.filter { s.getImage(iconIds.getValue(it.id)) == null }
+        val icons = withContext(Dispatchers.IO) {
+            missing.mapNotNull { c -> stickerMarker(container.media, c, density)?.let { iconIds.getValue(c.id) to it } }.toMap()
         }
-        val icons = withContext(Dispatchers.Default) { missing.associateWith { pinBitmap(it, density, mono) } }
         icons.forEach { (id, bitmap) -> if (s.getImage(id) == null) s.addImage(id, bitmap) }
-        val features = shown.map { capture ->
+        if (s.getImage(DOT_ICON) == null) s.addImage(DOT_ICON, dotBitmap(density))
+        val features = ordered.mapIndexed { i, capture ->
             val (lat, lon) = displayCoords(capture, amap)
+            val icon = iconIds.getValue(capture.id).takeIf { s.getImage(it) != null } ?: DOT_ICON
             Feature.fromGeometry(Point.fromLngLat(lon, lat)).apply {
-                addStringProperty("icon", pinIds.getValue(capture.id))
+                addStringProperty("icon", icon)
                 addStringProperty("cid", capture.id)
+                addNumberProperty("order", i)
             }
         }
         s.getSourceAs<GeoJsonSource>(SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(features))
@@ -312,6 +331,26 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
             }
         }
     }
+
+    placeIds?.let { ids ->
+        val byId = captures.associateBy { it.id }
+        val group = ids.mapNotNull { byId[it] }
+        if (group.isNotEmpty()) {
+            val first = group.first()
+            val title = group.firstNotNullOfOrNull { c -> c.placeName?.takeIf { it.isNotBlank() } }
+                ?: formatCoord(first.latitude!!, first.longitude!!)
+            PlaceSheet(
+                title = title,
+                captures = group,
+                radiusM = NEARBY_RADIUS_M,
+                onOpen = { id ->
+                    placeIds = null
+                    openCapture(id)
+                },
+                onDismiss = { placeIds = null },
+            )
+        }
+    }
 }
 
 /**
@@ -373,57 +412,62 @@ private fun tintVectorStyle(style: Style) {
     }
 }
 
-/** Catalogue number per species key, counted by when each species was first seen. */
-private fun speciesNumbers(captures: List<CaptureEntity>): Map<String, Int> =
-    captures.filter { !it.nameZh.isNullOrBlank() }
-        .groupBy { speciesKey(it) }
-        .map { (key, list) -> key to list.minOf { it.createdAt } }
-        .sortedBy { it.second }
-        .mapIndexed { i, (key, _) -> key to i + 1 }
-        .toMap()
+private const val DOT_ICON = "pin-dot"
 
-private fun pinId(number: Int?): String = if (number == null) "pin-dot" else "pin-$number"
+/** Image id for a capture's map sticker; changes when the capture is edited (e.g. re-cut). */
+private fun stickerIconId(capture: CaptureEntity): String = "st-${capture.id}-${capture.updatedAt}"
 
 /**
- * A small white pin with a rust ring: the species' catalogue number in mono,
- * or a rust dot for finds that have no name yet.
+ * The die-cut sticker itself (it already carries a white border), shrunk to
+ * about 52dp on its long side, with a soft shadow following its outline.
  */
-private fun pinBitmap(id: String, density: Float, mono: android.graphics.Typeface): Bitmap {
-    val number = id.removePrefix("pin-").toIntOrNull()
-    val label = number?.toString()
-    val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = Pine.toArgb()
-        typeface = mono
-        textSize = 9.5f * density
-        textAlign = android.graphics.Paint.Align.CENTER
+private fun stickerMarker(media: MediaFiles, capture: CaptureEntity, density: Float): Bitmap? = runCatching {
+    val file = media.file(capture.stickerFile)
+    if (!file.exists()) return@runCatching null
+    val target = (52f * density).roundToInt().coerceAtLeast(24)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    var sample = 1
+    while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= target) sample *= 2
+    val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+        ?: return@runCatching null
+    val scale = target.toFloat() / max(decoded.width, decoded.height)
+    val w = max(1, (decoded.width * scale).roundToInt())
+    val h = max(1, (decoded.height * scale).roundToInt())
+    val sticker = Bitmap.createScaledBitmap(decoded, w, h, true)
+    if (sticker !== decoded) decoded.recycle()
+
+    val pad = (5f * density).roundToInt()
+    val out = Bitmap.createBitmap(w + pad * 2, h + pad * 2, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(out)
+    val outline = sticker.extractAlpha()
+    val shadow = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(64, 30, 50, 40)
+        maskFilter = android.graphics.BlurMaskFilter(2.5f * density, android.graphics.BlurMaskFilter.Blur.NORMAL)
     }
-    val minSide = 20f * density
-    val width = max(minSide, (label?.let { textPaint.measureText(it) } ?: 0f) + 10f * density)
-    val height = minSide
+    canvas.drawBitmap(outline, pad.toFloat(), pad + 1.2f * density, shadow)
+    outline.recycle()
+    canvas.drawBitmap(sticker, pad.toFloat(), pad.toFloat(), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+    sticker.recycle()
+    out
+}.getOrNull()
+
+/** Fallback for a find whose sticker file is missing: a small white dot with a rust centre. */
+private fun dotBitmap(density: Float): Bitmap {
+    val side = 16f * density
     val shadow = 1.5f * density
-    val bitmap = Bitmap.createBitmap((width + shadow * 2).roundToInt(), (height + shadow * 2).roundToInt(), Bitmap.Config.ARGB_8888)
+    val size = (side + shadow * 2).roundToInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
-    val rect = android.graphics.RectF(shadow, shadow, shadow + width, shadow + height)
-    val r = height / 2
+    val c = size / 2f
     val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         color = Card.toArgb()
         setShadowLayer(shadow, 0f, 0.5f * density, android.graphics.Color.argb(46, 30, 50, 40))
     }
-    canvas.drawRoundRect(rect, r, r, fill)
-    val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = Rust.toArgb()
-        style = android.graphics.Paint.Style.STROKE
-        strokeWidth = 1.6f * density
-    }
-    val inset = ring.strokeWidth / 2
-    canvas.drawRoundRect(android.graphics.RectF(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset), r - inset, r - inset, ring)
-    if (label != null) {
-        val baseline = rect.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-        canvas.drawText(label, rect.centerX(), baseline, textPaint)
-    } else {
-        val dot = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Rust.toArgb() }
-        canvas.drawCircle(rect.centerX(), rect.centerY(), 3f * density, dot)
-    }
+    canvas.drawCircle(c, c, side / 2, fill)
+    val dot = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Rust.toArgb() }
+    canvas.drawCircle(c, c, 3f * density, dot)
     return bitmap
 }
 

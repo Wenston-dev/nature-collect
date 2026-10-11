@@ -21,6 +21,7 @@ import androidx.core.content.res.ResourcesCompat
 import io.github.wgd753.naturecollect.R
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.MediaFiles
+import io.github.wgd753.naturecollect.data.Settings
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ui.tr
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,7 @@ object ShareCard {
     /** Renders the card, writes it to the cache and opens the share sheet. */
     suspend fun share(context: Context, media: MediaFiles, capture: CaptureEntity, number: Int?, encounter: Int? = null) {
         val uri = withContext(Dispatchers.IO) {
-            val bitmap = render(media, capture, number, SpecimenCanvas.monoTypeface(context), encounter)
+            val bitmap = render(media, capture, number, SpecimenCanvas.monoTypeface(context), encounter, Settings.showStamp(context))
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
             val file = File(dir, "shiye-${capture.id.take(12)}.png")
@@ -69,7 +70,7 @@ object ShareCard {
         context.startActivity(chooser)
     }
 
-    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?, mono: Typeface? = null, encounter: Int? = null): Bitmap {
+    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?, mono: Typeface? = null, encounter: Int? = null, stamp: Boolean = true): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(SpecimenCanvas.CELADON)
@@ -81,7 +82,7 @@ object ShareCard {
         val sheet = RectF(64f, 64f, WIDTH - 64f, HEIGHT - 64f)
         SpecimenCanvas.sheet(canvas, sheet)
 
-        // Sticker, large in the upper part, held by two strips of tape.
+        // Sticker, large in the upper part.
         val boxTop = sheet.top + 90f
         val boxBottom = sheet.top + 830f
         val boxSize = min(sheet.width() - 160f, boxBottom - boxTop)
@@ -94,12 +95,10 @@ object ShareCard {
             val dst = RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
             SpecimenCanvas.sticker(canvas, sticker, dst, rotation = -4f)
             sticker.recycle()
-            SpecimenCanvas.tape(canvas, dst.left + w * 0.16f, dst.top + h * 0.1f, 120f, 40f, -32f)
-            SpecimenCanvas.tape(canvas, dst.right - w * 0.16f, dst.top + h * 0.06f, 120f, 40f, 26f)
         }
 
         // Date stamp, top right.
-        SpecimenCanvas.dateStamp(canvas, sheet.right - 120f, sheet.top + 120f, 78f, capture.createdAt, monoFace)
+        if (stamp) SpecimenCanvas.dateStamp(canvas, sheet.right - 120f, sheet.top + 120f, 78f, capture.createdAt, monoFace)
 
         // Herbarium label, bottom right.
         val rows = buildList {
@@ -126,7 +125,7 @@ object ShareCard {
             color = SpecimenCanvas.SOFT
             textSize = 26f
             typeface = monoFace
-            letterSpacing = 0.2f
+            letterSpacing = 0.08f
         }
         canvas.drawText("拾野 · SHIYE", sheet.left + 48f, sheet.bottom - 52f, markPaint)
         return bitmap
