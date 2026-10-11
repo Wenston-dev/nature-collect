@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.FloatBuffer
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -214,9 +215,19 @@ class SamSegmenter(private val context: Context) {
         if (guide != null && prompt !is SamPrompt.Points) {
             // Box corners use labels 2 (top-left) and 3 (bottom-right), then a positive point deep inside.
             val box = MaskOps.bounds(FloatArray(w * h) { if (guide[it]) 1f else 0f }, w, h)!!
-            val inner = MaskOps.interiorPoint(guide, w, h)
-            coordList += listOf(box[0].toFloat(), box[1].toFloat(), box[2] - 1f, box[3] - 1f, inner.x, inner.y)
-            labelList += listOf(2f, 3f, 1f)
+            // One point deep inside each salient blob, so a loop around several pieces keeps them all.
+            val (blobs, count) = MaskOps.label(guide, w, h)
+            val sizes = IntArray(count + 1).also { c -> blobs.forEach { c[it]++ } }
+            val inner = (1..count).sortedByDescending { sizes[it] }.take(4).map { l ->
+                MaskOps.interiorPoint(BooleanArray(w * h) { blobs[it] == l }, w, h)
+            }
+            coordList += listOf(box[0].toFloat(), box[1].toFloat(), box[2] - 1f, box[3] - 1f)
+            labelList += listOf(2f, 3f)
+            inner.forEach { p ->
+                coordList += p.x
+                coordList += p.y
+                labelList += 1f
+            }
             negatives.forEach { p ->
                 coordList += p.x
                 coordList += p.y
@@ -226,7 +237,7 @@ class SamSegmenter(private val context: Context) {
             coordList += 0f
             labelList += -1f
             singleTap = false
-            seeds = listOf(inner)
+            seeds = inner
         } else when (prompt) {
             SamPrompt.Auto -> {
                 // Nothing stands out: fall back to whatever is in the middle of the frame.
@@ -384,21 +395,58 @@ class SamSegmenter(private val context: Context) {
         return BooleanArray(w * h) { i -> bytes.get((i / w) * row + i % w).toInt() != 0 }
     }
 
-    /** Rasterises the loop, grown by a few percent so a loose circle doesn't clip the subject. */
+    /**
+     * Rasterises the loop, grown by a few percent so a loose circle doesn't clip the subject.
+     * A loop twisted into a figure eight pinches the subject at the crossing, so then its
+     * convex hull is used: the whole area the gesture went around.
+     */
     private fun lassoMask(path: List<PromptPoint>, w: Int, h: Int): BooleanArray {
+        val filled = fillPolygon(path, w, h, grow = 0f)
+        val area = filled.count { it }
+        // A twisted loop's lobes have opposite orientation, so its signed area mostly cancels out.
+        var signed = 0.0
+        for (i in path.indices) {
+            val a = path[i]
+            val b = path[(i + 1) % path.size]
+            signed += a.x.toDouble() * b.y - b.x.toDouble() * a.y
+        }
+        val twisted = abs(signed) / 2 < 0.6 * area
+        return fillPolygon(if (twisted) convexHull(path) else path, w, h, grow = max(w, h) * 0.06f)
+    }
+
+    private fun fillPolygon(path: List<PromptPoint>, w: Int, h: Int, grow: Float): BooleanArray {
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
         val canvas = android.graphics.Canvas(bitmap)
         val shape = android.graphics.Path().apply {
+            // Non-zero winding: every part of the loop counts as inside, even where it crosses itself.
+            fillType = android.graphics.Path.FillType.WINDING
             path.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
             close()
         }
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.FILL_AND_STROKE
-            strokeWidth = max(w, h) * 0.06f
+            style = if (grow > 0f) android.graphics.Paint.Style.FILL_AND_STROKE else android.graphics.Paint.Style.FILL
+            strokeWidth = grow
             strokeJoin = android.graphics.Paint.Join.ROUND
         }
         canvas.drawPath(shape, paint)
         return readMask(bitmap, w, h)
+    }
+
+    /** Andrew's monotone chain. */
+    private fun convexHull(points: List<PromptPoint>): List<PromptPoint> {
+        val sorted = points.sortedWith(compareBy({ it.x }, { it.y }))
+        if (sorted.size < 3) return sorted
+        fun cross(o: PromptPoint, a: PromptPoint, b: PromptPoint) = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+        val hull = ArrayList<PromptPoint>()
+        for (pass in 0..1) {
+            val start = hull.size
+            for (p in if (pass == 0) sorted else sorted.asReversed()) {
+                while (hull.size >= start + 2 && cross(hull[hull.size - 2], hull[hull.size - 1], p) <= 0) hull.removeAt(hull.lastIndex)
+                hull += p
+            }
+            hull.removeAt(hull.lastIndex)
+        }
+        return hull
     }
 
     companion object {
