@@ -27,9 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.activeUnderline
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.Divider
@@ -129,3 +132,29 @@ private fun sizeLabels(count: Int): List<String> = when (count) {
     else -> listOf(tr("小", "S"), tr("中", "M"), tr("大", "L"), tr("最大", "XL")).take(count)
 }
 
+
+/**
+ * Uses the whole photo instead of a cutout. After a couple of circles or taps
+ * that haven't been confirmed, it breathes gently to suggest itself.
+ */
+@Composable
+fun WholePhotoButton(state: CutoutState?, onClick: () -> Unit) {
+    val suggest = (state?.attempts ?: 0) >= 2
+    val pulse = if (suggest) {
+        val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "whole")
+        transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.06f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(900),
+                androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "scale",
+        ).value
+    } else {
+        1f
+    }
+    Box(Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse }) {
+        PillButton(tr("整张贴上", "Use whole photo"), onClick = onClick)
+    }
+}

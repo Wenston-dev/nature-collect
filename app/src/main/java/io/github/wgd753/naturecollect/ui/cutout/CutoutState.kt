@@ -65,6 +65,10 @@ class CutoutState(
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** How many times the user has circled or tapped; after a couple, offer the whole photo. */
+    var attempts by mutableIntStateOf(0)
+        private set
+
     /** Eraser mode: strokes remove things instead of choosing them. */
     var erasing by mutableStateOf(false)
 
@@ -81,6 +85,7 @@ class CutoutState(
 
     fun select(prompt: SamPrompt) {
         erasing = false
+        attempts++
         val current = history.last()
         push(if (replaces(current)) Step(listOf(Part(prompt))) else current.copy(parts = current.parts + Part(prompt)))
     }

@@ -81,7 +81,7 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 PillButton(tr("取消", "Cancel"), onClick = onDismiss)
-                PillButton(tr("整张贴上", "Use whole photo")) { onDone(StickerMaker.framed(photo)) }
+                WholePhotoButton(state) { onDone(StickerMaker.framed(photo)) }
                 PillButton(tr("用抠出的", "Use cutout"), primary = true, enabled = state?.hasSelection == true) {
                     scope.launch { state?.sticker()?.let(onDone) }
                 }

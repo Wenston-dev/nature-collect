@@ -101,6 +101,12 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
         _stage.value = CameraStage.Sticker(stage.image, sticker)
     }
 
+    /** Skips the cutout: the whole photo, framed, becomes the sticker. */
+    fun useWholePhoto() {
+        val original = photo ?: return
+        confirmSelection(StickerMaker.framed(original))
+    }
+
     fun save() {
         val stage = _stage.value as? CameraStage.Sticker ?: return
         val original = photo ?: return

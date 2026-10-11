@@ -128,6 +128,7 @@ import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.cutout.CutoutEditor
+import io.github.wgd753.naturecollect.ui.cutout.WholePhotoButton
 import io.github.wgd753.naturecollect.ui.cutout.rememberCutoutState
 import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ui.holographic
@@ -755,6 +756,7 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PillButton(tr("重拍", "Retake"), onClick = vm::reset)
+            WholePhotoButton(state, vm::useWholePhoto)
             PillButton(tr("就它了", "Use this"), primary = true, enabled = state.hasSelection) {
                 scope.launch { state.sticker()?.let(vm::confirmSelection) }
             }
