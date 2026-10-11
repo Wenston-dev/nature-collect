@@ -81,7 +81,7 @@ GitHub Actions 会编译 APK，并在 Releases 页面建好对应版本，附上
 
 ## 开源协议
 
-协议待定。
+代码以 [MIT](LICENSE) 协议发布。随附的 EdgeTAM、U²-Net 模型为 Apache-2.0，DM Mono 字体为 SIL Open Font License，宣传片里的照片来自 Wikimedia Commons，作者和授权见 `promo/credits.txt`。
 
 ---
 
@@ -93,4 +93,5 @@ GitHub Actions 会编译 APK，并在 Releases 页面建好对应版本，附上
 - **Identification**: uses any OpenAI-compatible chat completions API with image input. DeepSeek is the default; get a key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it in Settings. Only the cut-out sticker is uploaded; cut-out runs on the phone.
 - **Features**: on-device cut-out, identification, field guide with categories, per-species timeline, map, calendar, sticker boards, share cards, achievements, Chinese/English UI, backup and restore.
 - **Build**: JDK 17 + Android SDK, `./gradlew assembleDebug`.
+- **License**: MIT. Bundled models are Apache-2.0, the DM Mono font is OFL, promo photos are credited in `promo/credits.txt`.
 - **Release**: bump `versionCode` / `versionName`, push a tag `vX.Y.Z`; GitHub Actions builds the APK and attaches it to a release.
