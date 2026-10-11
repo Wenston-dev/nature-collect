@@ -28,3 +28,14 @@ node render.mjs video out/shiye_promo.mp4 30 0 44.5  # 渲染整片
 - `scripts/fetch.py`：按 `cand/` 里选中的编号下载原图到 `photos/`。注意要用标准缩略图宽度，否则会被 429 限流。
 - `scripts/stickers.py <名字...>`：用 rembg（isnet-general-use）抠图，按 `StickerMaker` 的规则加白边和阴影，同时输出边缘图和蒙版。
 - 地图是 OpenStreetMap 西湖一带 z14 瓦片拼成的 `site/img/map.png`。
+
+## 声音
+
+- 配乐：Sascha Ende《Bright New Day》（CC BY 4.0），截取 0:36 起的 44.5 秒。从 Commons 下载时要用转码版 `.../transcoded/9/99/Bright_New_Day_by_Sascha_Ende.mp3/Bright_New_Day_by_Sascha_Ende.mp3.ogg`，原文件会被 429 限流。
+- 音效：`scripts/sfx.py` 按 `site/app.js` 的时间点合成点按、弹出、揭起、提示音、盖章和笔划声，快门声用 Commons 上公有领域的 Holga 录音，输出 `audio/sfx.wav`。
+- 混音和合成：
+
+```bash
+ffmpeg -ss 36 -t 44.5 -i audio/bright.ogg -i audio/sfx.wav -filter_complex "[0:a]aresample=48000,loudnorm=I=-20:TP=-3,afade=t=in:d=0.4,afade=t=out:st=42.0:d=2.5,volume=0.85[m];[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=0.9[s];[m][s]amix=inputs=2:normalize=0,loudnorm=I=-15:TP=-1.5[a]" -map "[a]" audio/mix.wav
+ffmpeg -i out/shiye_promo.mp4 -i audio/mix.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest out/with_audio.mp4
+```

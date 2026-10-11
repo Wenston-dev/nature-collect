@@ -15,9 +15,12 @@
 - 菜粉蝶：Pieris rapae - Small white 12.jpg，作者 Zeynel Cebeci，CC BY-SA 4.0，https://commons.wikimedia.org/wiki/File:Pieris_rapae_-_Small_white_12.jpg
 - 开场风景：Dülmen, Wildpark -- 2018 -- 1458-62.jpg，作者 Dietmar Rabich，CC BY-SA 4.0，https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Wildpark_--_2018_--_1458-62.jpg
 
+音乐：Bright New Day，作者 Sascha Ende，CC BY 4.0，https://commons.wikimedia.org/wiki/File:Bright_New_Day_by_Sascha_Ende.mp3（截取 0:36–1:20）
+快门声：Holga shuttersound.ogg，公有领域，https://commons.wikimedia.org/wiki/File:Holga_shuttersound.ogg
+其他音效（点按、弹出、揭起、提示音、盖章、笔划）由脚本合成（scripts/sfx.py）。
 地图：© OpenStreetMap 贡献者，ODbL（https://www.openstreetmap.org/copyright）
 字体：Noto Sans SC（SIL OFL），DM Mono（SIL OFL，App 内置）
 Logo：拾野四叶草（项目自有）
 
 发小红书时可在简介里贴这一段：
-照片来自 Wikimedia Commons：Alvesgaspar；Avenue；Dietmar Rabich；Greg Peterson；Jakub Hałun；Laitche；Ninjatacoshell；Noel Reynolds；Nrik kiran；Yoo Chung；Zeynel Cebeci（CC BY / CC BY-SA）。地图 © OpenStreetMap 贡献者。
+照片来自 Wikimedia Commons：Alvesgaspar；Avenue；Dietmar Rabich；Greg Peterson；Jakub Hałun；Laitche；Ninjatacoshell；Noel Reynolds；Nrik kiran；Yoo Chung；Zeynel Cebeci（CC BY / CC BY-SA）。音乐 Bright New Day by Sascha Ende（CC BY 4.0）。地图 © OpenStreetMap 贡献者。
