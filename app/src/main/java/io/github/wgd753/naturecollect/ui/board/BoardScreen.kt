@@ -162,7 +162,7 @@ import io.github.wgd753.naturecollect.ui.theme.Soft
 import io.github.wgd753.naturecollect.ui.theme.spaced
 import io.github.wgd753.naturecollect.ui.TapeStrip
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.shape.RectangleShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import io.github.wgd753.naturecollect.ui.paperGrain
