@@ -55,11 +55,13 @@ APK 在 `app/build/outputs/apk/debug/`。
 2. 推送同名 tag：
 
    ```bash
-   git tag v0.10.1
-   git push origin v0.10.1
+   git tag v1.0.0
+   git push origin v1.0.0
    ```
 
 GitHub Actions 会编译 APK，并在 Releases 页面建好对应版本，附上安装包。tag 和 `versionName` 对不上时构建会直接失败。
+
+不方便推 tag 时，也可以在 Actions 页面手动运行 Android build 并勾选 release，会按 `versionName` 自动打 tag 并发布。
 
 ### 签名密钥
 

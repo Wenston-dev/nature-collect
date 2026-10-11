@@ -6,7 +6,14 @@ on:
     # Pushing a tag like v0.10.1 also publishes the APK on the Releases page.
     tags: ["v*"]
   pull_request:
+  # Running it by hand with "release" ticked publishes the current versionName
+  # as tag v<versionName>, for when pushing a tag isn't an option.
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish to Releases as v<versionName>
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -16,7 +23,7 @@ jobs:
     env:
       # Set this repository secret to pin the signing key for good (see README).
       SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release == true }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,9 +31,13 @@ jobs:
         if: env.IS_RELEASE == 'true'
         run: |
           version=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "RELEASE_TAG=v$version" >> "$GITHUB_ENV"
+          elif [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match versionName $version in app/build.gradle.kts"
             exit 1
+          else
+            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
           fi
 
       - uses: actions/setup-java@v4
@@ -83,11 +94,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          apk="shiye-$GITHUB_REF_NAME.apk"
+          apk="shiye-$RELEASE_TAG.apk"
           cp app/build/outputs/apk/release/app-release.apk "$apk"
           # A release made on the web page already exists; just attach the APK.
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$apk" --clobber
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$apk" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$apk" --title "拾野 $GITHUB_REF_NAME" --generate-notes
+            gh release create "$RELEASE_TAG" "$apk" --target "$GITHUB_SHA" --title "拾野 $RELEASE_TAG" --generate-notes
           fi
