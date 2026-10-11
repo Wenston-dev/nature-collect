@@ -26,9 +26,9 @@ import kotlinx.coroutines.withContext
  * what was erased and which size was picked. Every change is a step that can
  * be undone.
  *
- * The first circle or tap chooses the subject; later ones add to it, so a
- * subject the model splits apart can be gathered up piece by piece. The
- * automatic first guess is the exception: a tap or circle replaces it.
+ * A circle chooses the subject; taps after that add to it, so a subject the
+ * model splits apart can be gathered up piece by piece. The automatic first
+ * guess is replaced by the first tap.
  */
 class CutoutState(
     val image: SamImage,
@@ -76,7 +76,7 @@ class CutoutState(
     val hasSelection: Boolean get() = optionCount > 0 && !busy
     val canErase: Boolean get() = history.last().parts.isNotEmpty()
 
-    /** The next circle or tap adds to the selection instead of replacing it. */
+    /** The next tap adds to the selection instead of replacing it. */
     val adding: Boolean get() = history.last().let { !replaces(it) }
 
     init {
@@ -87,7 +87,8 @@ class CutoutState(
         erasing = false
         attempts++
         val current = history.last()
-        push(if (replaces(current)) Step(listOf(Part(prompt))) else current.copy(parts = current.parts + Part(prompt)))
+        // A new loop starts over; taps add to what's there.
+        push(if (prompt is SamPrompt.Lasso || replaces(current)) Step(listOf(Part(prompt))) else current.copy(parts = current.parts + Part(prompt)))
     }
 
     fun erase(stroke: List<PromptPoint>) {

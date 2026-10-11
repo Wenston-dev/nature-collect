@@ -11,7 +11,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.FloatBuffer
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -181,10 +180,10 @@ class SamSegmenter(private val context: Context) {
      * so the user can widen or narrow the selection.
      *
      * With no prompt or a lasso, the salient subject (in the whole photo, or
-     * inside the loop) is handed to EdgeTAM as a tight box plus an inner point,
-     * and the candidate that best matches it is the default. A loose box on its
-     * own makes SAM-style models pick the background, so the loop's outline is
-     * only used to clip the result. A tap that lands on a salient region picks
+     * roughly where the loop was drawn) is handed to EdgeTAM as a tight box plus
+     * an inner point, and the candidate that best matches it is the default. A
+     * loose box on its own makes SAM-style models pick the background, so the
+     * loop only says where to look; it doesn't need to be closed or neat. A tap that lands on a salient region picks
      * the candidate matching that region; otherwise the default leans towards the
      * larger candidates, because the model's "best" mask often grabs just one
      * part of an object (the cap of a bottle, one petal).
@@ -205,7 +204,7 @@ class SamSegmenter(private val context: Context) {
         // The salient region that should be cut out, if the saliency map has one.
         val guide = when (prompt) {
             SamPrompt.Auto -> MaskOps.salientSubject(image.saliency, w, h)
-            is SamPrompt.Lasso -> MaskOps.salientSubject(image.saliency, w, h, roi = lasso, centerWeight = false)
+            is SamPrompt.Lasso -> MaskOps.salientSubject(image.saliency, w, h, roi = lasso, center = centroid(prompt.path))
             is SamPrompt.Points -> prompt.points.singleOrNull()?.let { MaskOps.salientAt(image.saliency, w, h, it) }
         }
         val coordList = ArrayList<Float>()
@@ -314,7 +313,8 @@ class SamSegmenter(private val context: Context) {
                     masks.get(logits)
                     val alpha = MaskOps.toAlpha(logits, w, h, seeds)
                     for (i in alpha.indices) {
-                        if ((lasso != null && !lasso[i]) || (eraseMask != null && eraseMask[i])) alpha[i] = 0f
+                        // With a guide the loop only says roughly where to look; it clips only the fallback.
+                        if ((lasso != null && guide == null && !lasso[i]) || (eraseMask != null && eraseMask[i])) alpha[i] = 0f
                     }
                     // EdgeTAM's own scores are poorly calibrated (whole objects often score
                     // lowest), so with a guide the overlap with it decides instead.
@@ -396,30 +396,19 @@ class SamSegmenter(private val context: Context) {
     }
 
     /**
-     * Rasterises the loop, grown by a few percent so a loose circle doesn't clip the subject.
-     * A loop twisted into a figure eight pinches the subject at the crossing, so then its
-     * convex hull is used: the whole area the gesture went around.
+     * The rough area a loop points at: the convex hull of the stroke, grown by a
+     * margin, so an open, wobbly or crossed scribble works as well as a neat circle.
      */
-    private fun lassoMask(path: List<PromptPoint>, w: Int, h: Int): BooleanArray {
-        val filled = fillPolygon(path, w, h, grow = 0f)
-        val area = filled.count { it }
-        // A twisted loop's lobes have opposite orientation, so its signed area mostly cancels out.
-        var signed = 0.0
-        for (i in path.indices) {
-            val a = path[i]
-            val b = path[(i + 1) % path.size]
-            signed += a.x.toDouble() * b.y - b.x.toDouble() * a.y
-        }
-        val twisted = abs(signed) / 2 < 0.6 * area
-        return fillPolygon(if (twisted) convexHull(path) else path, w, h, grow = max(w, h) * 0.06f)
-    }
+    private fun lassoMask(path: List<PromptPoint>, w: Int, h: Int): BooleanArray =
+        fillPolygon(convexHull(path), w, h, grow = max(w, h) * 0.15f)
+
+    private fun centroid(path: List<PromptPoint>) =
+        PromptPoint(path.sumOf { it.x.toDouble() }.toFloat() / path.size, path.sumOf { it.y.toDouble() }.toFloat() / path.size)
 
     private fun fillPolygon(path: List<PromptPoint>, w: Int, h: Int, grow: Float): BooleanArray {
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
         val canvas = android.graphics.Canvas(bitmap)
         val shape = android.graphics.Path().apply {
-            // Non-zero winding: every part of the loop counts as inside, even where it crosses itself.
-            fillType = android.graphics.Path.FillType.WINDING
             path.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
             close()
         }

@@ -45,7 +45,7 @@ import io.github.wgd753.naturecollect.ui.tr
 
 /**
  * Photo + selection tools shared by the camera and the board's gallery import:
- * circle or tap to choose (again to add more), eraser to remove extra things, size steps to
+ * circle or tap to choose (more taps add to it), eraser to remove extra things, size steps to
  * widen or narrow SAM's mask, and undo for any of it.
  */
 @Composable
@@ -53,7 +53,7 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
     Text(
         text = when {
             state.erasing -> tr("涂抹要擦掉的部分", "Paint over what to erase")
-            state.adding -> tr("继续圈点可加入选区", "Circle or tap more to add")
+            state.adding -> tr("点选可加入选区", "Tap to add more")
             else -> tr("圈出或点选", "Circle or tap")
         },
         modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 6.dp),

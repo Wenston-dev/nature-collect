@@ -44,7 +44,7 @@ import kotlin.math.hypot
 /**
  * The photo with the current selection highlighted. Draw a loop around what
  * you want (best for bottles, flowers, anything SAM might cut in half), or
- * tap it; further loops and taps add to the selection.
+ * tap it; further taps add to the selection.
  */
 @Composable
 fun SubjectPicker(
@@ -124,10 +124,6 @@ fun SubjectPicker(
                         drawPath(path, Rust.copy(alpha = 0.5f), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         return@drawWithContent
                     }
-                    // Drawn closed and lightly filled: everything inside the loop counts,
-                    // even where the line crosses itself.
-                    path.close()
-                    drawPath(path, Pine.copy(alpha = 0.12f))
                     val width = 2.dp.toPx()
                     drawPath(path, Pine.copy(alpha = 0.45f), style = Stroke(width + 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                     drawPath(

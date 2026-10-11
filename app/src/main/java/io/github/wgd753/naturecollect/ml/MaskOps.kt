@@ -210,11 +210,16 @@ object MaskOps {
 
     /**
      * The photo's main subject according to a saliency map in 0..1: the strongest
-     * salient region, weighted towards the middle of the frame when [centerWeight]
-     * is set. Inside a lasso ([roi]) every sizeable salient region is kept, since
-     * the loop already says where to look. Null when nothing stands out.
+     * salient region, weighted towards [center] (the middle of the frame, or of
+     * a loop), and only inside [roi] when given. Null when nothing stands out.
      */
-    fun salientSubject(saliency: FloatArray, w: Int, h: Int, roi: BooleanArray? = null, centerWeight: Boolean = true): BooleanArray? {
+    fun salientSubject(
+        saliency: FloatArray,
+        w: Int,
+        h: Int,
+        roi: BooleanArray? = null,
+        center: PromptPoint = PromptPoint(w / 2f, h / 2f),
+    ): BooleanArray? {
         val s = if (roi == null) saliency else FloatArray(saliency.size) { if (roi[it]) saliency[it] else 0f }
         val peak = s.max()
         if (peak < 0.2f) return null
@@ -236,23 +241,17 @@ object MaskOps {
         var bestScore = -1.0
         for (l in 1..count) {
             if (size[l] < w * h / 1000) continue
-            var score = mass[l]
-            if (centerWeight) {
-                val cx = sumX[l] / size[l] / w - 0.5
-                val cy = sumY[l] / size[l] / h - 0.5
-                score *= kotlin.math.exp(-(cx * cx + cy * cy) / (2 * 0.3 * 0.3))
-            }
+            // Favour blobs near the centre of the photo (or of the loop).
+            val cx = (sumX[l] / size[l] - center.x) / w
+            val cy = (sumY[l] / size[l] - center.y) / h
+            val score = mass[l] * kotlin.math.exp(-(cx * cx + cy * cy) / (2 * 0.3 * 0.3))
             if (score > bestScore) {
                 bestScore = score
                 best = l
             }
         }
         if (best == 0) return null
-        val keep = BooleanArray(w * h) { labels[it] == best }
-        if (roi != null) {
-            for (i in labels.indices) if (labels[i] != 0 && size[labels[i]] > size[best] / 5) keep[i] = true
-        }
-        return keep
+        return BooleanArray(w * h) { labels[it] == best }
     }
 
     /** The salient region under a tap, or null if the tap isn't on anything that stands out. */
