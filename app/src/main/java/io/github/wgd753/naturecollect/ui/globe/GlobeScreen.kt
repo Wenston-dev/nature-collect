@@ -53,6 +53,7 @@ import io.github.wgd753.naturecollect.location.ChinaCoords
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -75,7 +76,8 @@ private const val OSM_STYLE_URL = "https://tiles.openfreemap.org/styles/positron
 
 /**
  * 高德 raster tiles: no key, quick from mainland China. They are drawn in
- * GCJ-02, so pins are shifted with [ChinaCoords] to line up.
+ * GCJ-02, so pins are shifted with [ChinaCoords] to line up. Desaturated,
+ * softened and lifted towards the paper colour so the map reads as a wash.
  */
 private val AMAP_STYLE = """
     {"version":8,
@@ -84,8 +86,9 @@ private val AMAP_STYLE = """
                 "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
                 "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
                 "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"]}},
-     "layers":[{"id":"bg","type":"background","paint":{"background-color":"#EEF3EC"}},
-               {"id":"base","type":"raster","source":"base","paint":{"raster-saturation":-0.25}}]}
+     "layers":[{"id":"bg","type":"background","paint":{"background-color":"#F8F9F4"}},
+               {"id":"base","type":"raster","source":"base","paint":{
+                 "raster-saturation":-0.75,"raster-contrast":-0.25,"raster-brightness-min":0.12}}]}
 """.trimIndent()
 private const val SOURCE_ID = "captures"
 private const val LAYER_ID = "captures-layer"
@@ -252,10 +255,9 @@ fun GlobeScreen(onOpenCapture: (String) -> Unit) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Card)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .fillMaxWidth()
+                        .background(Paper.copy(alpha = 0.9f))
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Mascot(R.drawable.art_mascot_map, Modifier.size(64.dp))

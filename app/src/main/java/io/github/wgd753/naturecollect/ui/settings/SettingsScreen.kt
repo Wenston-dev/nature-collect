@@ -50,7 +50,12 @@ import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.FilterPill
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.data.Settings
-import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Forest
+import io.github.wgd753.naturecollect.ui.theme.Paper
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.HorizontalDivider
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -100,8 +105,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 20.dp),
         ) {
             Section(tr("物种识别", "Identification")) {
                 Text(
@@ -163,7 +167,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = {
+                    Button(colors = inkButton(), onClick = {
                         container.settings.setApiKey(key)
                         container.settings.setBaseUrl(baseUrl)
                         container.settings.setModel(model)
@@ -221,7 +225,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = {
+                    Button(colors = inkButton(), onClick = {
                         val stamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                         exportLauncher.launch(tr("拾野备份-$stamp.zip", "Shiye-backup-$stamp.zip"))
                     }) { Text(tr("导出备份", "Export")) }
@@ -264,15 +268,18 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-        content()
+    // No cards: sections sit on the paper, separated by a faint ink hairline.
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = TitleFont), color = Forest)
+            content()
+        }
     }
 }
+
+@Composable
+private fun inkButton(): ButtonColors = ButtonDefaults.buttonColors(containerColor = Forest, contentColor = Paper)

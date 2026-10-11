@@ -8,21 +8,21 @@ import androidx.compose.ui.graphics.Color
 private val NatureColors = lightColorScheme(
     primary = Forest,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFCDE5D6),
+    primaryContainer = Color(0xFFDDE7D6),
     onPrimaryContainer = ForestDeep,
     secondary = Sun,
     onSecondary = ForestDeep,
     tertiary = Coral,
     onTertiary = Color.White,
     background = Paper,
-    onBackground = Color(0xFF1C2A23),
+    onBackground = Forest,
     surface = Paper,
-    onSurface = Color(0xFF1C2A23),
-    surfaceVariant = Color(0xFFE2EBE0),
+    onSurface = Forest,
+    surfaceVariant = PaperDeep,
     onSurfaceVariant = TextMuted,
     surfaceContainer = Card,
     surfaceContainerHigh = Card,
-    error = Color(0xFFD64B3B),
+    error = Color(0xFFC0533F),
 )
 
 @Composable

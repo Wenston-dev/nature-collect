@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ui.Lang
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
 import io.github.wgd753.naturecollect.ui.tr
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -60,13 +62,11 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Card)
-            .padding(vertical = 16.dp, horizontal = 12.dp),
+            .padding(vertical = 16.dp),
     ) {
         Text(
             tr("足迹 · ${siblings.size} 次", "Encounters · ${siblings.size}"),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge.copy(fontFamily = TitleFont),
             color = primary,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
@@ -88,7 +88,7 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
                     .fillMaxWidth()
                     .height(IntrinsicSize.Min)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (current) primary.copy(alpha = 0.07f) else Card)
+                    .background(if (current) primary.copy(alpha = 0.06f) else Color.Transparent)
                     .clickable(enabled = !current) { onOpen(item.id) }
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -133,7 +133,15 @@ import io.github.wgd753.naturecollect.ui.cutout.rememberCutoutState
 import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Forest
+import io.github.wgd753.naturecollect.ui.theme.LatinStyle
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.theme.WashSap
+import io.github.wgd753.naturecollect.ui.WatercolorWash
+import io.github.wgd753.naturecollect.ui.paperGrain
+import io.github.wgd753.naturecollect.ui.washFor
+import androidx.compose.ui.graphics.lerp
 import io.github.wgd753.naturecollect.ui.theme.Paper
 import io.github.wgd753.naturecollect.ui.theme.PaperDeep
 import io.github.wgd753.naturecollect.ui.theme.Night
@@ -456,7 +464,8 @@ private fun ViewfinderCorners(modifier: Modifier) {
     )
 }
 
-private val ScanTint = Color(0xFF9BE8C8)
+/** Sap green washed most of the way to paper: reads as light on the dimmed photo. */
+private val ScanTint = lerp(WashSap, Paper, 0.6f)
 
 /**
  * While SAM works: the photo dims and a single scan line combs down it,
@@ -567,15 +576,15 @@ private fun HintChip(text: String, modifier: Modifier = Modifier, icon: ImageVec
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(Color(0xCC2B2A28))
+            .background(Paper.copy(alpha = 0.92f))
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = Forest, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        Text(text, color = Forest, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -614,8 +623,8 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
             modifier = Modifier.fillMaxSize().blur(28.dp * separate.value),
             contentScale = ContentScale.Crop,
         )
-        Box(Modifier.fillMaxSize().background(Paper.copy(alpha = 0.35f * separate.value)))
-        // One quiet burst as the sticker pops: a few white and sunflower glints.
+        Box(Modifier.fillMaxSize().background(Paper.copy(alpha = 0.5f * separate.value)))
+        // One quiet burst as the sticker pops: a few white and ochre glints.
         Canvas(Modifier.fillMaxSize()) {
             val t = burst.value
             if (t <= 0f || t >= 1f) return@Canvas
@@ -626,7 +635,7 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
                 val dist = base + size.minDimension * 0.16f * t
                 val p = c + Offset(kotlin.math.cos(angle), kotlin.math.sin(angle)) * dist
                 val r = (if (k % 2 == 0) 5.dp else 3.5.dp).toPx() * (1f - t * 0.5f)
-                val color = if (k % 3 == 0) Color(0xFFF5B83D) else Color.White
+                val color = if (k % 3 == 0) Sun else Color.White
                 drawCircle(color, radius = r, center = p, alpha = 1f - t)
             }
         }
@@ -764,7 +773,7 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
     val enter = remember { Animatable(0f) }
     LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
 
-    Box(Modifier.fillMaxSize().background(Paper), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Paper).paperGrain(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier
                 .graphicsLayer {
@@ -773,14 +782,20 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                     alpha = enter.value
                     translationY = (1f - enter.value) * 120f
                 }
-                .padding(24.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(Card)
-                .padding(28.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // No card: the sticker sits on a watercolour wash tinted by its category.
             capture?.let { c ->
-                StickerImage(c, Modifier.size(180.dp).holographic(0.3f, 3200))
+                Box(Modifier.size(260.dp), contentAlignment = Alignment.Center) {
+                    WatercolorWash(
+                        washFor(Category.fromKey(c.category)),
+                        seed = captureId.hashCode(),
+                        modifier = Modifier.fillMaxSize(),
+                        strength = 1.3f,
+                    )
+                    StickerImage(c, Modifier.size(180.dp).holographic(0.3f, 3200))
+                }
             }
             Spacer(Modifier.height(16.dp))
             Text(tr("已收入图鉴", "Added to collection"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
@@ -812,10 +827,20 @@ private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (St
                 val reveal = remember { Animatable(0f) }
                 LaunchedEffect(Unit) { reveal.animateTo(1f, tween(500)) }
                 Column(Modifier.alpha(reveal.value), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(c.displayName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-                    val category = Category.fromKey(c.category)
                     Text(
-                        "${category.emoji} ${category.display}" + (c.nameSci?.let { " · $it" } ?: ""),
+                        c.displayName,
+                        style = MaterialTheme.typography.displaySmall.copy(fontFamily = TitleFont),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                    c.nameSci?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(it.uppercase(), style = LatinStyle, color = TextMuted, textAlign = TextAlign.Center)
+                    }
+                    val category = Category.fromKey(c.category)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "${category.emoji} ${category.display}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     c.description?.let {

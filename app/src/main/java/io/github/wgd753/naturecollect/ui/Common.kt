@@ -1,5 +1,7 @@
 package io.github.wgd753.naturecollect.ui
 
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import io.github.wgd753.naturecollect.ui.theme.Sun
 import androidx.compose.animation.core.animateFloat
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
@@ -194,17 +196,16 @@ fun CategoryFilterRow(
 
 @Composable
 fun FilterPill(text: String, selected: Boolean, tint: Color? = null, onClick: () -> Unit) {
-    val accent = tint ?: MaterialTheme.colorScheme.primary
-    val bg by androidx.compose.animation.animateColorAsState(if (selected) accent else Card, label = "pillBg")
-    val fg by androidx.compose.animation.animateColorAsState(if (selected) Color.White else accent, label = "pillFg")
+    // Plain text; the active one gets a small watercolour wash behind it.
+    val wash = tint?.let { washFor(it) } ?: Sun
+    val fg by androidx.compose.animation.animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else TextMuted, label = "pillFg")
     Text(
         text = text,
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(bg)
-            .border(1.dp, if (selected) Color.Transparent else accent.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+            .then(if (selected) Modifier.watercolorWash(wash, text.hashCode(), strength = 1.4f) else Modifier)
             .clickable(onClick = onClick)
-            .padding(PaddingValues(horizontal = 14.dp, vertical = 8.dp)),
+            .padding(PaddingValues(horizontal = 12.dp, vertical = 7.dp)),
         style = MaterialTheme.typography.titleMedium,
         color = fg,
     )
@@ -218,6 +219,7 @@ fun PillButton(text: String, primary: Boolean = false, enabled: Boolean = true, 
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .background(if (primary) MaterialTheme.colorScheme.primary else Card)
+            .then(if (primary) Modifier else Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(16.dp)))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f },

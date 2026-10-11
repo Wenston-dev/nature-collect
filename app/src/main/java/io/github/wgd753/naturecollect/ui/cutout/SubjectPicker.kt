@@ -119,7 +119,7 @@ fun SubjectPicker(
                     if (erasingNow) {
                         // A soft wide trail the size of the eraser brush.
                         val brush = size.maxDimension * io.github.wgd753.naturecollect.ml.SamSegmenter.ERASER_WIDTH
-                        drawPath(path, Color(0x88FF5A5A), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        drawPath(path, Color(0x99E39A88), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         return@drawWithContent
                     }
                     val width = 3.dp.toPx()

@@ -155,6 +155,15 @@ import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.theme.Card
 import io.github.wgd753.naturecollect.ui.theme.InkSoft
+import io.github.wgd753.naturecollect.ui.theme.HandFont
+import io.github.wgd753.naturecollect.ui.theme.HandInk
+import io.github.wgd753.naturecollect.ui.paperGrain
+import io.github.wgd753.naturecollect.ui.washFor
+import io.github.wgd753.naturecollect.ui.watercolorWash
+import io.github.wgd753.naturecollect.ui.tint
+import io.github.wgd753.naturecollect.ui.collection.rememberStickerTint
+import io.github.wgd753.naturecollect.data.Category
+import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -230,7 +239,7 @@ private fun BoardEditor(
     val captureById = remember(captures) { captures.associateBy { it.id } }
     var selectedItemId by remember(board.id) { mutableStateOf<String?>(null) }
     var tool by remember { mutableStateOf(Tool.MOVE) }
-    var penColor by remember { mutableLongStateOf(0xFF1F5B45) }
+    var penColor by remember { mutableLongStateOf(HandInk.toArgb().toLong() and 0xFFFFFFFFL) }
     var penWidth by remember { mutableFloatStateOf(4f) }
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     var showTextDialog by remember { mutableStateOf(false) }
@@ -289,13 +298,14 @@ private fun BoardEditor(
             BoxWithConstraints(
                 Modifier
                     .aspectRatio(3f / 4f)
-                    .shadow(4.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
                     .drawWithContent {
                         exportLayer.record { this@drawWithContent.drawContent() }
                         drawLayer(exportLayer)
                     }
                     .background(Color(board.backgroundColor))
+                    .paperGrain()
                     .drawBehind { drawPattern(board.pattern) },
             ) {
                 val widthPx = constraints.maxWidth.toFloat()
@@ -350,7 +360,7 @@ private fun BoardEditor(
         ) { m ->
             when (m) {
                 2 -> Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(horizontal = 12.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ColorSwatchButton(penColor, tr("画笔颜色", "Pen color"), onPick = { penColor = it })
@@ -368,7 +378,7 @@ private fun BoardEditor(
                     }
                 }
                 1 -> Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(horizontal = 12.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -389,7 +399,7 @@ private fun BoardEditor(
                     }
                 }
                 else -> Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Card).padding(6.dp),
+                    Modifier.fillMaxWidth().padding(6.dp),
                 ) {
                     BarTool(Icons.Outlined.EmojiNature, tr("贴纸", "Stickers")) { sheet = Sheet.STICKERS }
                     BarTool(Icons.Outlined.TextFields, tr("文字", "Text")) { showTextDialog = true }
@@ -433,7 +443,6 @@ private fun BoardEditor(
                             Modifier
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Card)
                                 .clickable {
                                     sheet = null
                                     addSticker(capture)
@@ -575,11 +584,17 @@ private fun BoardSwitcher(
     }
 }
 
-/** Text fonts, stored by key on the item. */
+/** Text fonts, stored by key on the item; "hand" (and anything older) is the handwriting face. */
 private fun fontFor(key: String?): FontFamily = when (key) {
     "round" -> FontFamily.SansSerif
     "serif" -> FontFamily.Serif
-    else -> FontFamily.Cursive
+    else -> HandFont
+}
+
+/** The handwriting face has a single weight, so only the others get bold. */
+private fun weightFor(key: String?): FontWeight = when (key) {
+    "round", "serif" -> FontWeight.Bold
+    else -> FontWeight.Normal
 }
 
 /**
@@ -675,19 +690,31 @@ private fun TransformableItem(
             Modifier
         }
         when (item.type) {
-            BoardItemType.STICKER -> StickerImage(
-                capture!!,
-                Modifier
-                    .width(widthDp)
-                    .height(widthDp * aspect)
-                    .then(outline),
-            )
+            BoardItemType.STICKER -> {
+                // Each sticker sits on a soft wash of its own colour; overlapping ones pool together.
+                val wash = washFor(rememberStickerTint(capture!!, Category.fromKey(capture.category).tint))
+                Box(
+                    Modifier
+                        .width(widthDp * 1.3f)
+                        .height(widthDp * aspect * 1.3f)
+                        .watercolorWash(wash, item.id.hashCode(), strength = 0.9f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StickerImage(
+                        capture,
+                        Modifier
+                            .width(widthDp)
+                            .height(widthDp * aspect)
+                            .then(outline),
+                    )
+                }
+            }
             BoardItemType.TEXT -> Text(
                 text = item.text.orEmpty(),
                 modifier = outline.padding(horizontal = 8.dp, vertical = 4.dp),
                 color = Color(item.color),
                 fontFamily = fontFor(item.pathData),
-                fontWeight = FontWeight.Bold,
+                fontWeight = weightFor(item.pathData),
                 fontSize = 26.sp,
             )
             BoardItemType.IMAGE -> AsyncImage(
@@ -803,7 +830,7 @@ private fun DrawScope.drawPattern(pattern: Int) {
 @Composable
 private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Float) -> Unit) {
     var text by remember { mutableStateOf("") }
-    var color by remember { mutableLongStateOf(0xFF1F5B45) }
+    var color by remember { mutableLongStateOf(HandInk.toArgb().toLong() and 0xFFFFFFFFL) }
     var font by remember { mutableStateOf("hand") }
     var size by remember { mutableFloatStateOf(1f) }
     AlertDialog(
@@ -816,7 +843,7 @@ private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Floa
                     text.ifBlank { tr("预览", "Preview") },
                     color = Color(color),
                     fontFamily = fontFor(font),
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = weightFor(font),
                     fontSize = (22 * size).sp,
                     maxLines = 2,
                 )

@@ -58,8 +58,15 @@ import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.WatercolorWash
 import io.github.wgd753.naturecollect.ui.tr
+import io.github.wgd753.naturecollect.ui.washFor
+import io.github.wgd753.naturecollect.ui.theme.Forest
 import io.github.wgd753.naturecollect.ui.theme.InkSoft
+import io.github.wgd753.naturecollect.ui.theme.LatinStyle
+import io.github.wgd753.naturecollect.ui.theme.Sun
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -98,7 +105,7 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
             TextButton(onClick = {
                 monthOffset = 0
                 selectedEpochDay = today.toEpochDay()
-            }) { Text(tr("今天", "Today")) }
+            }) { Text(tr("今天", "Today"), color = Forest) }
         }
         DayCard(selected, byDay[selected].orEmpty(), onOpenCapture)
         CategoryFilterRow(selected = filter, onSelect = { filter = it }, modifier = Modifier.padding(top = 12.dp))
@@ -108,7 +115,7 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = { monthOffset-- }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = tr("上个月", "Previous month"), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = tr("上个月", "Previous month"), tint = Forest)
             }
             Text(
                 text = tr(
@@ -116,10 +123,10 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
                     "${month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${month.year}",
                 ),
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = Forest,
             )
             IconButton(onClick = { monthOffset++ }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = tr("下个月", "Next month"), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = tr("下个月", "Next month"), tint = Forest)
             }
         }
         AnimatedContent(
@@ -154,17 +161,15 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
     }
 }
 
-/** The big "today" card: date in bold numerals with the day's stickers scattered around. */
+/** The big "today" page: the date in title numerals with the day's stickers scattered around on washes. */
 @Composable
 private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture: (String) -> Unit) {
-    val ink = MaterialTheme.colorScheme.primary
+    val ink = Forest
     BoxWithConstraints(
         Modifier
             .padding(horizontal = 16.dp)
             .fillMaxWidth()
-            .height(210.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White),
+            .height(210.dp),
     ) {
         val spots = listOf(
             Triple(0.02f, 0.04f, -8f),
@@ -180,22 +185,31 @@ private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture
                     .size(96.dp)
                     .graphicsLayer { rotationZ = rot }
                     .clickable { onOpenCapture(capture.id) },
-            ) { StickerImage(capture, Modifier.fillMaxSize()) }
+            ) {
+                WatercolorWash(
+                    washFor(Category.fromKey(capture.category)),
+                    seed = capture.id.hashCode(),
+                    modifier = Modifier.fillMaxSize(),
+                    strength = 0.8f,
+                )
+                StickerImage(capture, Modifier.fillMaxSize().padding(10.dp))
+            }
         }
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("${day.year}", color = ink, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            Text("${day.year}", color = ink, fontFamily = TitleFont, fontSize = 18.sp, letterSpacing = 1.sp)
             Text(
                 day.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH).uppercase(),
                 color = ink,
-                fontWeight = FontWeight.Black,
-                fontSize = 26.sp,
+                style = LatinStyle,
+                fontSize = 13.sp,
             )
             Text(
                 "${day.dayOfYear}/${day.lengthOfYear()} ${day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()}",
-                color = ink,
-                fontSize = 11.sp,
+                color = TextMuted,
+                style = LatinStyle,
+                fontSize = 10.sp,
             )
-            Text("${day.dayOfMonth}", color = ink, fontWeight = FontWeight.Black, fontSize = 72.sp, lineHeight = 72.sp)
+            Text("${day.dayOfMonth}", color = ink, fontFamily = TitleFont, fontSize = 72.sp, lineHeight = 76.sp)
         }
         if (captures.isNotEmpty()) {
             Text(
@@ -204,17 +218,17 @@ private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp)
                     .offset(x = 70.dp)
-                    .border(2.dp, ink, CircleShape)
+                    .border(1.dp, ink.copy(alpha = 0.6f), CircleShape)
                     .padding(horizontal = 9.dp, vertical = 2.dp),
                 color = ink,
-                fontWeight = FontWeight.Bold,
+                fontFamily = TitleFont,
             )
         } else {
             Text(
                 tr("这天还没有收集", "Nothing collected this day"),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TextMuted,
             )
         }
     }
@@ -275,43 +289,45 @@ private fun DayCell(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.primary
+    val ink = Forest
+    val seed = date.toEpochDay().toInt()
     Box(
         Modifier
             .fillMaxSize()
             .padding(2.dp)
             .clip(RoundedCornerShape(14.dp))
-            .then(if (isSelected) Modifier.background(InkSoft.copy(alpha = 0.22f)) else Modifier)
+            .then(if (isSelected) Modifier.border(1.dp, ink.copy(alpha = 0.55f), RoundedCornerShape(14.dp)) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (captures.isEmpty()) {
-            Box(
-                Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(if (isToday) ink else Color.Transparent),
-                contentAlignment = Alignment.Center,
-            ) {
+            Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                if (isToday) WatercolorWash(Sun, seed = seed, modifier = Modifier.fillMaxSize())
                 Text(
                     "${date.dayOfMonth}",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (isToday) Color.White else ink,
+                    fontWeight = FontWeight.Normal,
+                    color = ink,
                 )
             }
         } else {
-            StickerImage(captures.first(), Modifier.fillMaxSize().padding(2.dp))
+            val first = captures.first()
+            WatercolorWash(
+                if (isToday) Sun else washFor(Category.fromKey(first.category)),
+                seed = seed,
+                modifier = Modifier.fillMaxSize(),
+                strength = 0.8f,
+            )
+            StickerImage(first, Modifier.fillMaxSize().padding(5.dp))
             if (captures.size > 1) {
                 Text(
                     "${captures.size}",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .clip(CircleShape)
-                        .background(ink)
-                        .padding(horizontal = 6.dp),
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                        .padding(end = 3.dp),
+                    color = ink,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
                 )
             }
         }

@@ -17,7 +17,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +43,13 @@ import io.github.wgd753.naturecollect.ui.theme.Forest
 import io.github.wgd753.naturecollect.ui.theme.ForestDeep
 import io.github.wgd753.naturecollect.ui.theme.Paper
 import io.github.wgd753.naturecollect.ui.theme.Sun
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import io.github.wgd753.naturecollect.ui.theme.WashSap
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesomeMosaic
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -117,7 +123,8 @@ fun NatureCollectApp() {
     if (!onboarded && apiKey == null) Onboarding(onDone = container.settings::setOnboarded)
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        modifier = Modifier.background(Paper).paperGrain(),
+        containerColor = Color.Transparent,
         bottomBar = {
             AnimatedVisibility(
                 visible = onTab,
@@ -179,48 +186,50 @@ fun NatureCollectApp() {
 }
 
 /**
- * A floating capsule instead of a flat tab bar: two tabs either side and a
- * raised sunflower shutter in the middle that opens the camera.
+ * A paper tab bar that fades up into the page: line icons either side and a
+ * raised ochre watercolour blot in the middle that opens the camera.
  */
 @Composable
 private fun FloatingNavBar(current: Tab?, onSelect: (Tab) -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
+            .background(Brush.verticalGradient(0f to Paper.copy(alpha = 0f), 0.45f to Paper, 1f to Paper))
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
+            .padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 4.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .shadow(16.dp, RoundedCornerShape(32.dp), ambientColor = ForestDeep, spotColor = ForestDeep)
-                .clip(RoundedCornerShape(32.dp))
-                .background(Forest)
-                .padding(horizontal = 6.dp),
+                .height(56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NavItem(Tab.Collection, current, onSelect)
             NavItem(Tab.Globe, current, onSelect)
-            Spacer(Modifier.width(78.dp))
+            Spacer(Modifier.width(84.dp))
             NavItem(Tab.Calendar, current, onSelect)
             NavItem(Tab.Board, current, onSelect)
         }
         val cameraSelected = current == Tab.Camera
-        val lift by animateDpAsState(if (cameraSelected) (-22).dp else (-14).dp, spring(dampingRatio = 0.5f), label = "shutterLift")
+        val lift by animateDpAsState(if (cameraSelected) (-18).dp else (-10).dp, spring(dampingRatio = 0.5f), label = "shutterLift")
         Box(
             Modifier
                 .offset(y = lift)
-                .size(70.dp)
-                .shadow(10.dp, CircleShape, spotColor = ForestDeep)
+                .size(78.dp)
                 .clip(CircleShape)
-                .background(Sun)
-                .border(5.dp, Paper, CircleShape)
                 .clickable { onSelect(Tab.Camera) },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.PhotoCamera, contentDescription = Tab.Camera.label, tint = ForestDeep, modifier = Modifier.size(30.dp))
+            // A soft paper-ochre core casts the shadow; the blot gives it a painted edge.
+            Box(
+                Modifier
+                    .size(54.dp)
+                    .shadow(10.dp, CircleShape, ambientColor = ForestDeep.copy(alpha = 0.35f), spotColor = ForestDeep.copy(alpha = 0.35f))
+                    .background(lerp(Paper, Sun, 0.55f), CircleShape),
+            )
+            WatercolorWash(Sun, seed = 7, modifier = Modifier.size(78.dp), strength = 2.2f)
+            Icon(Icons.Outlined.PhotoCamera, contentDescription = Tab.Camera.label, tint = Forest, modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -228,19 +237,26 @@ private fun FloatingNavBar(current: Tab?, onSelect: (Tab) -> Unit) {
 @Composable
 private fun RowScope.NavItem(tab: Tab, current: Tab?, onSelect: (Tab) -> Unit) {
     val selected = tab == current
-    val bg by animateColorAsState(if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent, label = "navBg")
-    val tint by animateColorAsState(if (selected) Sun else Color.White.copy(alpha = 0.62f), label = "navTint")
+    val tint by animateColorAsState(if (selected) Forest else TextMuted, label = "navTint")
     Column(
         Modifier
             .weight(1f)
             .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(bg)
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onSelect(tab) }
-            .padding(vertical = 7.dp),
+            .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
-        Text(tab.label, color = tint, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
+        Box(Modifier.size(width = 40.dp, height = 28.dp), contentAlignment = Alignment.Center) {
+            if (selected) WatercolorWash(WashSap, seed = tab.ordinal + 3, modifier = Modifier.fillMaxSize(), strength = 1.6f)
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(21.dp))
+        }
+        Text(
+            tab.label,
+            color = tint,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp, fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal),
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

@@ -41,9 +41,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
 /** A handful of starting points; anything else comes from the picker. */
+// Paper and the sketchbook inks first, then a few brighter pigments and pale papers.
 val QuickColors = listOf(
-    0xFFFFFFFF, 0xFF1C2A23, 0xFF1F5B45, 0xFF3E9B57, 0xFF3D7DCA, 0xFF9B5BD6,
-    0xFFE45A92, 0xFFE4574A, 0xFFF0775A, 0xFFF5B83D, 0xFFF6EBD9, 0xFFEEF3EC,
+    0xFFF8F9F4, 0xFF3F5A48, 0xFF2F4639, 0xFF5C7350, 0xFF3D7DCA, 0xFF9B5BD6,
+    0xFFE4574A, 0xFFE58A1F, 0xFFFFFFFF, 0xFFF6EBD9, 0xFFEEF3EC, 0xFFEDEFE6,
 )
 
 /**

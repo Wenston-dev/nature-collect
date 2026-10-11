@@ -90,7 +90,19 @@ import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.Lang
-import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Forest
+import io.github.wgd753.naturecollect.ui.theme.HandFont
+import io.github.wgd753.naturecollect.ui.theme.HandInk
+import io.github.wgd753.naturecollect.ui.theme.LatinStyle
+import io.github.wgd753.naturecollect.ui.theme.TextMuted
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.washFor
+import io.github.wgd753.naturecollect.ui.watercolorWash
+import io.github.wgd753.naturecollect.ui.collection.rememberStickerTint
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -271,68 +283,112 @@ fun CaptureDetailScreen(
         }
         if (c == null) return@Column
 
+        val category = Category.fromKey(c.category)
+        val wash = washFor(rememberStickerTint(c, category.tint))
+        val hairline = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AnimatedContent(targetState = showPhoto, label = "photoToggle") { photo ->
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(24.dp))
-                        .clickable { showPhoto = !showPhoto },
+                        .then(
+                            if (photo) {
+                                Modifier.clip(RoundedCornerShape(24.dp))
+                            } else {
+                                Modifier.watercolorWash(wash, c.id.hashCode(), strength = 1.3f)
+                            },
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showPhoto = !showPhoto },
                     contentAlignment = Alignment.Center,
                 ) {
                     if (photo) {
                         MediaImage(container.media.file(c.photoFile), Modifier.fillMaxSize())
                     } else {
-                        StickerImage(c, Modifier.fillMaxSize().padding(12.dp).holographic(0.32f, 3000))
+                        // A small fixed tilt per capture, like a sticker pressed on by hand.
+                        val tilt = remember(c.id) { Random(c.id.hashCode()).nextFloat() * 8f - 4f }
+                        StickerImage(
+                            c,
+                            Modifier
+                                .fillMaxSize()
+                                .padding(36.dp)
+                                .graphicsLayer { rotationZ = tilt }
+                                .holographic(0.32f, 3000),
+                        )
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(c.displayName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    c.displayName,
+                    fontFamily = TitleFont,
+                    fontSize = 32.sp,
+                    letterSpacing = 2.sp,
+                    color = Forest,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 IconButton(onClick = { editingName = true }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = tr("改名字", "Rename"), tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Outlined.Edit, contentDescription = tr("改名字", "Rename"), tint = TextMuted, modifier = Modifier.size(18.dp))
                 }
             }
             Text(
-                c.nameSci ?: tr("还没有英文名 / 学名，点 ✎ 补充", "No English name yet. Tap ✎ to add"),
+                c.nameSci?.uppercase() ?: tr("还没有英文名 / 学名，点 ✎ 补充", "No English name yet. Tap ✎ to add"),
                 modifier = Modifier.clickable { editingName = true },
-                fontStyle = if (c.nameSci != null) FontStyle.Italic else FontStyle.Normal,
-                style = if (c.nameSci != null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = if (c.nameSci != null) LatinStyle else MaterialTheme.typography.labelMedium,
+                color = TextMuted,
             )
-            Spacer(Modifier.height(8.dp))
-            RecognitionLine(c) { scope.launch { container.recognition.retry(c.id) } }
             Spacer(Modifier.height(12.dp))
-            Column(
+            RecognitionLine(c) { scope.launch { container.recognition.retry(c.id) } }
+            Text(
+                listOfNotNull(shortDate(c.createdAt), c.placeName?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMuted,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Card)
                     .clickable { editingDescription = true }
-                    .padding(16.dp),
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.Top,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(tr("简介", "About"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑简介", "Edit description"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                }
-                Spacer(Modifier.height(4.dp))
                 Text(
                     c.description ?: tr("还没有简介，点这里写一句，或者让 AI 帮你写", "No description yet. Tap to write one, or let AI do it"),
-                    color = if (c.description != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (c.description != null) Forest else TextMuted,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = tr("编辑简介", "Edit description"),
+                    tint = TextMuted,
+                    modifier = Modifier.padding(start = 8.dp, top = 2.dp).size(14.dp),
+                )
+            }
+            c.note?.takeIf { it.isNotBlank() }?.let { note ->
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    note,
+                    fontFamily = HandFont,
+                    fontSize = 22.sp,
+                    lineHeight = 30.sp,
+                    color = HandInk,
+                    modifier = Modifier.fillMaxWidth().clickable { editingNotes = true },
                 )
             }
             val alternatives = c.alternatives?.split('|')?.filter { it.isNotBlank() }.orEmpty()
             if (alternatives.isNotEmpty() && c.status == RecognitionStatus.DONE) {
                 Spacer(Modifier.height(12.dp))
-                Text(tr("也可能是：", "Could also be:"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("也可能是：", "Could also be:"), style = MaterialTheme.typography.labelMedium, color = TextMuted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     alternatives.forEach { name ->
                         FilterPill(name, selected = false) {
@@ -346,6 +402,7 @@ fun CaptureDetailScreen(
             }
             if (siblings.size > 1) {
                 Spacer(Modifier.height(16.dp))
+                HorizontalDivider(thickness = 1.dp, color = hairline)
                 Timeline(siblings, currentId = c.id, onOpen = { if (it != c.id) onOpenCapture(it) })
             }
             Spacer(Modifier.height(16.dp))
@@ -354,8 +411,8 @@ fun CaptureDetailScreen(
                     tr("时间", "Time") to formatDate(c.createdAt),
                     tr("地点", "Place") to (c.placeName ?: tr("未填写", "Not set")),
                     tr("坐标", "Coordinates") to (c.latitude?.let { "%.5f, %.5f".format(it, c.longitude) } ?: tr("没有位置信息", "No location")),
-                    tr("笔记", "Notes") to (c.note ?: "—"),
                 ),
+                hairline = hairline,
                 onEdit = { editingNotes = true },
             )
             Spacer(Modifier.height(32.dp))
@@ -442,44 +499,60 @@ fun CaptureDetailScreen(
 @Composable
 private fun RecognitionLine(capture: CaptureEntity, onRetry: () -> Unit) {
     val category = Category.fromKey(capture.category)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Tag("${category.emoji} ${category.display}", color = category.tint.copy(alpha = 0.22f))
-        when (capture.status) {
-            RecognitionStatus.DONE -> capture.confidence?.let { Tag(tr("把握 ${(it * 100).toInt()}%", "${(it * 100).toInt()}% sure")) }
-            RecognitionStatus.MANUAL -> Tag(tr("手动命名", "Named by hand"))
-            RecognitionStatus.PENDING, RecognitionStatus.RUNNING -> Tag(capture.errorMessage ?: tr("等待识别", "Waiting"))
-            RecognitionStatus.FAILED -> Tag(capture.errorMessage ?: tr("识别失败", "Not recognized"))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Category as a small watercolour pill in its own wash.
+        Text(
+            category.display,
+            modifier = Modifier
+                .watercolorWash(washFor(category), category.key.hashCode(), strength = 1.6f)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = Forest,
+        )
+        val status = when (capture.status) {
+            RecognitionStatus.DONE -> capture.confidence?.let { tr("把握 ${(it * 100).toInt()}%", "${(it * 100).toInt()}% sure") }
+            RecognitionStatus.MANUAL -> tr("手动命名", "Named by hand")
+            RecognitionStatus.PENDING, RecognitionStatus.RUNNING -> capture.errorMessage ?: tr("等待识别", "Waiting")
+            RecognitionStatus.FAILED -> capture.errorMessage ?: tr("识别失败", "Not recognized")
         }
+        status?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = TextMuted) }
         if (capture.status == RecognitionStatus.FAILED || capture.status == RecognitionStatus.DONE ||
             (capture.status == RecognitionStatus.PENDING && capture.errorMessage != null)
         ) {
-            IconButton(onClick = onRetry) {
-                Icon(Icons.Outlined.Refresh, contentDescription = tr("重新识别", "Recognize again"), tint = MaterialTheme.colorScheme.primary)
+            IconButton(onClick = onRetry, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Outlined.Refresh, contentDescription = tr("重新识别", "Recognize again"), tint = TextMuted, modifier = Modifier.size(16.dp))
             }
         }
     }
 }
 
+/** "10月11日 15:20" this year, with the year added for older finds. */
+private fun shortDate(millis: Long): String {
+    val locale = if (Lang.english) java.util.Locale.ENGLISH else java.util.Locale.CHINA
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val sameYear = then.get(java.util.Calendar.YEAR) == java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    val pattern = if (sameYear) tr("M月d日 HH:mm", "MMM d HH:mm") else tr("yyyy年M月d日 HH:mm", "MMM d, yyyy HH:mm")
+    return java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(millis))
+}
+
 @Composable
-private fun InfoCard(rows: List<Pair<String, String>>, onEdit: () -> Unit) {
+private fun InfoCard(rows: List<Pair<String, String>>, hairline: Color, onEdit: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Card)
-            .clickable(onClick = onEdit)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .clickable(onClick = onEdit),
     ) {
         rows.forEachIndexed { i, (label, value) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, modifier = Modifier.padding(end = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value, modifier = Modifier.weight(1f))
+            HorizontalDivider(thickness = 1.dp, color = hairline)
+            Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(label, modifier = Modifier.padding(end = 16.dp), style = MaterialTheme.typography.bodyMedium, color = TextMuted)
+                Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Forest)
                 if (i == 0) {
-                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = TextMuted, modifier = Modifier.size(16.dp))
                 }
             }
         }
+        HorizontalDivider(thickness = 1.dp, color = hairline)
     }
 }
 

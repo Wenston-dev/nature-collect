@@ -21,6 +21,10 @@ import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
 import io.github.wgd753.naturecollect.ui.Lang
 import io.github.wgd753.naturecollect.ui.tr
+import io.github.wgd753.naturecollect.ui.washFor
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.res.ResourcesCompat
+import android.graphics.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -40,16 +44,16 @@ object ShareCard {
     private const val HEIGHT = 1440
     private const val MARGIN = 96f
 
-    private val PAPER = 0xFFEEF3EC.toInt()
-    private val FOREST = 0xFF1F5B45.toInt()
-    private val FOREST_DEEP = 0xFF143D2E.toInt()
-    private val MUTED = 0xFF6B7A71.toInt()
+    private val PAPER = 0xFFF8F9F4.toInt()
+    private val FOREST = 0xFF2F4639.toInt()
+    private val FOREST_DEEP = 0xFF24372D.toInt()
+    private val MUTED = 0xFF7F8F84.toInt()
 
     /** Renders the card, writes it to the cache and opens the share sheet. */
     suspend fun share(context: Context, media: MediaFiles, capture: CaptureEntity, number: Int?) {
         val uri = withContext(Dispatchers.IO) {
             val mark = runCatching { android.graphics.BitmapFactory.decodeResource(context.resources, io.github.wgd753.naturecollect.R.drawable.art_logo) }.getOrNull()
-            val bitmap = render(media, capture, number, mark)
+            val bitmap = render(media, capture, number, mark, CanvasWash.titleTypeface(context))
             mark?.recycle()
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
@@ -72,23 +76,28 @@ object ShareCard {
         context.startActivity(chooser)
     }
 
-    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?, mark: Bitmap? = null): Bitmap {
+    fun render(media: MediaFiles, capture: CaptureEntity, number: Int?, mark: Bitmap? = null, titleFace: Typeface? = null): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(PAPER)
-        drawGrain(canvas)
+        CanvasWash.grain(canvas, WIDTH, HEIGHT)
+        val category = Category.fromKey(capture.category)
+        val wash = washFor(category).toArgb()
 
         // Sticker, large and centred in the upper part, with a faint contact shadow.
         val boxTop = 120f
         val boxBottom = 880f
         val boxSize = min(WIDTH - MARGIN * 2, boxBottom - boxTop)
         loadSticker(media.file(capture.stickerFile), boxSize.toInt())?.let { sticker ->
-            val scale = min(boxSize / sticker.width, boxSize / sticker.height)
+            // Leave room around the sticker for the wash to show.
+            val scale = min(boxSize / sticker.width, boxSize / sticker.height) * 0.82f
             val w = sticker.width * scale
             val h = sticker.height * scale
             val cx = WIDTH / 2f
             val cy = (boxTop + boxBottom) / 2f
             val dst = RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+            // A watercolour blot in the category's wash, a little larger than the sticker.
+            CanvasWash.blot(canvas, cx, cy, boxSize * 0.5f, boxSize * 0.46f, wash, capture.id.hashCode(), strength = 1.3f)
             runCatching {
                 val blur = Paint().apply { maskFilter = BlurMaskFilter(18f / scale, BlurMaskFilter.Blur.NORMAL) }
                 val offset = IntArray(2)
@@ -116,22 +125,23 @@ object ShareCard {
 
         val textWidth = WIDTH - MARGIN * 2
 
-        // Category, letter-spaced, above the name.
-        val category = Category.fromKey(capture.category)
+        // Category as a small wash pill above the name.
         val categoryPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = MUTED
-            textSize = 26f
-            letterSpacing = 0.28f
-            typeface = Typeface.DEFAULT_BOLD
+            color = FOREST
+            textSize = 28f
+            letterSpacing = 0.12f
         }
-        val categoryText = if (Lang.english) category.display.uppercase(Locale.ENGLISH) else category.display
-        canvas.drawText(ellipsize(categoryText, categoryPaint, textWidth), MARGIN, 1008f, categoryPaint)
+        val categoryText = ellipsize(if (Lang.english) category.display.uppercase(Locale.ENGLISH) else category.display, categoryPaint, textWidth)
+        val pillWidth = categoryPaint.measureText(categoryText) + 44f
+        CanvasWash.blot(canvas, MARGIN + pillWidth / 2 - 6f, 998f, pillWidth / 2, 28f, wash, category.key.hashCode(), strength = 1.6f)
+        canvas.drawText(categoryText, MARGIN + 16f, 1008f, categoryPaint)
 
         // Name.
         val namePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = FOREST_DEEP
-            textSize = 88f
-            typeface = Typeface.DEFAULT_BOLD
+            color = FOREST
+            textSize = 92f
+            typeface = titleFace ?: Typeface.DEFAULT_BOLD
+            letterSpacing = if (titleFace != null) 0.06f else 0f
         }
         canvas.drawText(ellipsize(capture.displayName, namePaint, textWidth), MARGIN, 1112f, namePaint)
 
@@ -140,11 +150,12 @@ object ShareCard {
         capture.nameSci?.takeIf { it.isNotBlank() }?.let { sci ->
             val sciPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = MUTED
-                textSize = 42f
-                typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+                textSize = 30f
+                letterSpacing = 0.18f
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             }
-            y += 68f
-            canvas.drawText(ellipsize(sci, sciPaint, textWidth), MARGIN, y, sciPaint)
+            y += 62f
+            canvas.drawText(ellipsize(sci.uppercase(Locale.ENGLISH), sciPaint, textWidth), MARGIN, y, sciPaint)
         }
 
         // Provenance line.
@@ -165,7 +176,7 @@ object ShareCard {
         val markPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = FOREST
             textSize = 40f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = titleFace ?: Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
             textAlign = Paint.Align.RIGHT
         }
@@ -178,21 +189,6 @@ object ShareCard {
             canvas.drawBitmap(mark, null, android.graphics.RectF(right - w, top, right, top + h), Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
         }
         return bitmap
-    }
-
-    /** Very faint paper grain: a tiled noise texture at a few percent alpha. */
-    private fun drawGrain(canvas: Canvas) {
-        val size = 192
-        val random = Random(7)
-        val pixels = IntArray(size * size) {
-            val dark = random.nextBoolean()
-            val alpha = random.nextInt(0, 14)
-            if (dark) (alpha shl 24) or 0x143D2E else (alpha shl 24) or 0xFFFFFF
-        }
-        val tile = Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
-        val paint = Paint().apply { shader = BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT) }
-        canvas.drawRect(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), paint)
-        tile.recycle()
     }
 
     private fun loadSticker(file: File, target: Int): Bitmap? = runCatching {
@@ -209,4 +205,101 @@ object ShareCard {
     private fun day(millis: Long): String =
         if (Lang.english) SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH).format(Date(millis))
         else SimpleDateFormat("yyyy.MM.dd", Locale.CHINA).format(Date(millis))
+}
+
+/**
+ * Plain android.graphics versions of the app's watercolour look, for images
+ * rendered off screen (share card, poster).
+ */
+internal object CanvasWash {
+
+    @Volatile private var cachedTitle: Typeface? = null
+
+    /** ZCOOL XiaoWei for titles, or null if the font can't be loaded. */
+    fun titleTypeface(context: Context): Typeface? =
+        cachedTitle ?: runCatching { ResourcesCompat.getFont(context, io.github.wgd753.naturecollect.R.font.zcool_xiaowei) }
+            .getOrNull()?.also { cachedTitle = it }
+
+    /**
+     * An irregular watercolour blot centred on ([cx], [cy]): a broad pale pool,
+     * a denser offset pool, a little granulation and a slightly darker drying edge.
+     */
+    fun blot(canvas: Canvas, cx: Float, cy: Float, rx: Float, ry: Float, color: Int, seed: Int, strength: Float = 1f) {
+        val rnd = Random(seed)
+        val main = blobPath(cx, cy, rx, ry, rnd)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+        fun alpha(a: Float) = (a * strength * 255).toInt().coerceIn(0, 255)
+
+        paint.alpha = alpha(0.24f)
+        canvas.drawPath(main, paint)
+        val second = blobPath(
+            cx + (rnd.nextFloat() - 0.5f) * rx * 0.18f,
+            cy + (rnd.nextFloat() - 0.5f) * ry * 0.18f,
+            rx * (0.9f + rnd.nextFloat() * 0.08f),
+            ry * (0.86f + rnd.nextFloat() * 0.1f),
+            rnd,
+        )
+        paint.alpha = alpha(0.10f)
+        canvas.drawPath(second, paint)
+        val inner = blobPath(
+            cx + (rnd.nextFloat() - 0.5f) * rx * 0.25f,
+            cy + (rnd.nextFloat() - 0.5f) * ry * 0.25f,
+            rx * (0.62f + rnd.nextFloat() * 0.12f),
+            ry * (0.6f + rnd.nextFloat() * 0.12f),
+            rnd,
+        )
+        paint.alpha = alpha(0.15f)
+        canvas.drawPath(inner, paint)
+
+        // Pigment granulation: sparse darker specks inside the blot.
+        canvas.save()
+        canvas.clipPath(main)
+        paint.alpha = alpha(0.22f)
+        val specks = (rx * ry / 220f).toInt().coerceIn(20, 900)
+        val speck = (min(rx, ry) * 0.012f).coerceIn(0.8f, 2.4f)
+        repeat(specks) {
+            canvas.drawCircle(cx + (rnd.nextFloat() * 2 - 1) * rx, cy + (rnd.nextFloat() * 2 - 1) * ry, speck, paint)
+        }
+        canvas.restore()
+
+        // The drying edge.
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = (min(rx, ry) * 0.02f).coerceIn(1.5f, 4f)
+        paint.alpha = alpha(0.32f)
+        canvas.drawPath(main, paint)
+    }
+
+    private fun blobPath(cx: Float, cy: Float, rx: Float, ry: Float, rnd: Random): Path {
+        val n = 64
+        val k1 = rnd.nextFloat() * 6.28f
+        val k2 = rnd.nextFloat() * 6.28f
+        val k3 = rnd.nextFloat() * 6.28f
+        val a1 = 0.07f + rnd.nextFloat() * 0.06f
+        val a2 = 0.04f + rnd.nextFloat() * 0.04f
+        return Path().apply {
+            for (i in 0 until n) {
+                val t = i * 2 * Math.PI.toFloat() / n
+                val wobble = 1f + a1 * kotlin.math.sin(2 * t + k1) + a2 * kotlin.math.sin(3 * t + k2) + 0.025f * kotlin.math.sin(7 * t + k3)
+                val x = cx + kotlin.math.cos(t) * rx * wobble
+                val y = cy + kotlin.math.sin(t) * ry * wobble
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+            close()
+        }
+    }
+
+    /** Very faint paper grain: a tiled noise texture at a few percent alpha. */
+    fun grain(canvas: Canvas, width: Int, height: Int) {
+        val size = 192
+        val random = Random(7)
+        val pixels = IntArray(size * size) {
+            val dark = random.nextBoolean()
+            val alpha = random.nextInt(0, 14)
+            if (dark) (alpha shl 24) or 0x2F4639 else (alpha shl 24) or 0xFFFFFF
+        }
+        val tile = Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+        val paint = Paint().apply { shader = BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT) }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        tile.recycle()
+    }
 }

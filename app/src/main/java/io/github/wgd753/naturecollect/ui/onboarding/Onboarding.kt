@@ -70,6 +70,8 @@ import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.theme.Forest
 import io.github.wgd753.naturecollect.ui.theme.ForestDeep
 import io.github.wgd753.naturecollect.ui.theme.Sun
+import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.paperGrain
 import kotlinx.coroutines.launch
 
 private const val DEEPSEEK_KEYS_URL = "https://platform.deepseek.com/api_keys"
@@ -96,6 +98,7 @@ fun Onboarding(onDone: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(Paper)
+                .paperGrain()
                 .systemBarsPadding()
                 .imePadding(),
         ) {
@@ -175,7 +178,7 @@ private fun IntroPage(art: Int, title: String, body: String) {
     ) {
         Mascot(art, Modifier.size(220.dp))
         Spacer(Modifier.height(36.dp))
-        Text(title, color = ForestDeep, fontSize = 26.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(title, color = Forest, fontFamily = TitleFont, fontSize = 28.sp, letterSpacing = 1.6.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(10.dp))
         Text(body, color = TextMuted, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
     }
@@ -192,7 +195,7 @@ private fun WideButton(text: String, enabled: Boolean = true, onClick: () -> Uni
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Text(text, color = Paper, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -227,7 +230,7 @@ private fun ApiKeyPage(onNext: () -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp),
     ) {
-        Text(tr("接上 AI 识别", "Connect AI"), color = ForestDeep, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text(tr("接上 AI 识别", "Connect AI"), color = Forest, fontFamily = TitleFont, fontSize = 28.sp, letterSpacing = 1.6.sp)
         Spacer(Modifier.height(8.dp))
         Text(
             tr(

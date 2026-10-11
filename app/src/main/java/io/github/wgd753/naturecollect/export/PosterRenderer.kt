@@ -14,6 +14,8 @@ import io.github.wgd753.naturecollect.data.MediaFiles
 import io.github.wgd753.naturecollect.data.SpeciesGroup
 import io.github.wgd753.naturecollect.ui.Lang
 import io.github.wgd753.naturecollect.ui.tr
+import io.github.wgd753.naturecollect.ui.washFor
+import androidx.compose.ui.graphics.toArgb
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,7 +26,7 @@ import kotlin.math.min
  * Draws the collection as one tall poster: a title, stats per category and a
  * grid of stickers with their names, ready to share or print.
  */
-class PosterRenderer(private val media: MediaFiles) {
+class PosterRenderer(private val media: MediaFiles, private val titleFace: Typeface? = null) {
 
     fun render(groups: List<SpeciesGroup>, title: String): Bitmap {
         val width = 1080
@@ -47,13 +49,14 @@ class PosterRenderer(private val media: MediaFiles) {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(PAPER)
-        drawDots(canvas, width, height)
+        CanvasWash.grain(canvas, width, height)
 
         // Header.
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = INK
             textSize = 92f
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD_ITALIC)
+            typeface = titleFace ?: Typeface.DEFAULT_BOLD
+            letterSpacing = if (titleFace != null) 0.06f else 0f
         }
         canvas.drawText(title, margin, 150f, titlePaint)
         val total = groups.sumOf { it.captures.size }
@@ -67,8 +70,7 @@ class PosterRenderer(private val media: MediaFiles) {
         // Category chips.
         val chipPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = 32f
-            typeface = Typeface.DEFAULT_BOLD
-            color = Color.WHITE
+            color = INK
         }
         val bg = Paint(Paint.ANTI_ALIAS_FLAG)
         var x = margin
@@ -82,8 +84,8 @@ class PosterRenderer(private val media: MediaFiles) {
                 x = margin
                 y += 76f
             }
-            bg.color = tint(category)
-            canvas.drawRoundRect(RectF(x, y, x + w, y + 60f), 30f, 30f, bg)
+            // A small wash pill in the category's colour, ink text on top.
+            CanvasWash.blot(canvas, x + w / 2, y + 30f, w / 2, 30f, wash(category), category.key.hashCode(), strength = 1.5f)
             canvas.drawText(text, x + 24f, y + 41f, chipPaint)
             x += w + 16f
         }
@@ -92,23 +94,23 @@ class PosterRenderer(private val media: MediaFiles) {
         val namePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = INK
             textSize = if (columns == 4) 28f else 34f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = titleFace ?: Typeface.DEFAULT_BOLD
             textAlign = Paint.Align.CENTER
         }
         val countPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
+            color = PAPER
             textSize = 26f
             typeface = Typeface.DEFAULT_BOLD
             textAlign = Paint.Align.CENTER
         }
-        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CARD }
         val top = headerHeight
         shown.forEachIndexed { index, group ->
             val col = index % columns
             val row = index / columns
             val left = margin + col * (cell + gap)
             val cellTop = top + row * rowHeight
-            canvas.drawRoundRect(RectF(left, cellTop, left + cell, cellTop + cell + labelHeight - 8f), 36f, 36f, card)
+            // No cards: each sticker sits on a watercolour blot in its category's wash.
+            CanvasWash.blot(canvas, left + cell / 2, cellTop + cell / 2 + 6f, cell * 0.46f, cell * 0.42f, wash(group.category), group.key.hashCode(), strength = 1.2f)
 
             loadSticker(group, (cell * 0.86f).toInt())?.let { sticker ->
                 val box = cell * 0.86f
@@ -126,7 +128,7 @@ class PosterRenderer(private val media: MediaFiles) {
 
             val name = TextUtils.ellipsize(group.name, namePaint, cell - 32f, TextUtils.TruncateAt.END).toString()
             canvas.drawText(name, left + cell / 2, cellTop + cell + 34f, namePaint)
-            bg.color = tint(group.category)
+            bg.color = wash(group.category)
             canvas.drawCircle(left + cell / 2, cellTop + cell + 60f, 6f, bg)
 
             if (group.captures.size > 1) {
@@ -157,28 +159,14 @@ class PosterRenderer(private val media: MediaFiles) {
         BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
     }.getOrNull()
 
-    private fun drawDots(canvas: Canvas, width: Int, height: Int) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x14_1F2FC8 }
-        var y = 24f
-        while (y < height) {
-            var x = 24f
-            while (x < width) {
-                canvas.drawCircle(x, y, 2.5f, paint)
-                x += 48f
-            }
-            y += 48f
-        }
-    }
-
     private fun day(millis: Long) =
         SimpleDateFormat(tr("yyyy年M月d日", "MMMM d, yyyy"), if (Lang.english) Locale.ENGLISH else Locale.CHINA).format(Date(millis))
 
-    private fun tint(category: Category): Int = category.color.toInt()
+    private fun wash(category: Category): Int = washFor(category).toArgb()
 
     private companion object {
-        val PAPER = 0xFFEFEBE3.toInt()
-        val CARD = 0xFFF8F6F1.toInt()
-        val INK = 0xFF1F2FC8.toInt()
-        val MUTED = 0xFF8A877F.toInt()
+        val PAPER = 0xFFF8F9F4.toInt()
+        val INK = 0xFF2F4639.toInt()
+        val MUTED = 0xFF7F8F84.toInt()
     }
 }
