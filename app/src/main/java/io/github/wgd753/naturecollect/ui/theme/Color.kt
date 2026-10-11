@@ -2,42 +2,45 @@ package io.github.wgd753.naturecollect.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// "晕染" palette: a field sketchbook. White paper, ink-green text, and colour
-// only as watercolour washes behind the stickers.
+// "标本" palette: each cut-out is mounted on white card stock like a herbarium
+// specimen, on a pale celadon page. One accent only: rust.
 
-/** Ink green: titles, text, active icons, primary buttons. */
-val Forest = Color(0xFF2F4639)
-val ForestDeep = Color(0xFF24372D)
+/** Pine ink: titles, text, active icons, primary buttons. */
+val Pine = Color(0xFF22392F)
 
-/** Ochre wash: the shutter, highlights, the active filter. */
-val Sun = Color(0xFFE3B25B)
+/** Secondary text, inactive icons, mono metadata. */
+val Soft = Color(0xFF6F8277)
 
-/** Coral wash: badges and warm accents. */
-val Coral = Color(0xFFE39A88)
+/** The single accent: shutter ring, active underlines, stamps, map pins. */
+val Rust = Color(0xFFB4532E)
 
-/** Watercolour washes; see [io.github.wgd753.naturecollect.ui.washFor]. */
-val WashSap = Color(0xFF8FB07A)
-val WashWater = Color(0xFF8DB8C6)
-val WashOchre = Sun
-val WashCoral = Coral
-val WashLilac = Color(0xFFB4A7CF)
-val WashStone = Color(0xFFB9BFAF)
+/** Page background. */
+val Celadon = Color(0xFFE2EBE3)
 
-/** Paper page background. */
-val Paper = Color(0xFFF8F9F4)
-val PaperDeep = Color(0xFFEDEFE6)
+/** White card stock for specimen cards and sheets. */
+val Card = Color(0xFFFBFBF7)
 
-/** No white cards in this style: surfaces are the paper itself. */
-val Card = Paper
+/** Map water. */
+val Water = Color(0xFFC9DCD5)
+
+/** Dividers, and the herbarium label border. */
+val Divider = Color(0xFFDCE2DB)
+val LabelBorder = Color(0xFF9FB0A4)
+
+/** Linen tape strips at card corners. */
+val Tape = Color(0xD9E2DBC4)
 
 /** Near-black green for camera screens. */
 val Night = Color(0xFF101C16)
 
-/** Handwriting ink for notes and board text. */
-val HandInk = Color(0xFF3F5A48)
-
-// Older names, kept so every screen picks up the new palette.
-val Ink = Forest
-val InkSoft = Color(0xFF9FB0A5)
-
-val TextMuted = Color(0xFF7F8F84)
+// Older names, mapped so every screen picks up the new palette.
+val Forest = Pine
+val ForestDeep = Pine
+val Ink = Pine
+val HandInk = Pine
+val Sun = Rust
+val Coral = Rust
+val Paper = Celadon
+val PaperDeep = Divider
+val InkSoft = LabelBorder
+val TextMuted = Soft

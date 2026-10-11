@@ -83,12 +83,9 @@ import androidx.compose.material.icons.outlined.Cameraswitch
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.TouchApp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -119,6 +116,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -133,19 +133,21 @@ import io.github.wgd753.naturecollect.ui.cutout.rememberCutoutState
 import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.LatinStyle
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
-import io.github.wgd753.naturecollect.ui.theme.WashSap
-import io.github.wgd753.naturecollect.ui.WatercolorWash
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Celadon
+import io.github.wgd753.naturecollect.ui.theme.LabelBorder
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.DateStamp
+import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.paperGrain
-import io.github.wgd753.naturecollect.ui.washFor
-import androidx.compose.ui.graphics.lerp
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.PaperDeep
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.tapedCorners
+import io.github.wgd753.naturecollect.data.speciesKey
 import io.github.wgd753.naturecollect.ui.theme.Night
-import io.github.wgd753.naturecollect.ui.theme.Sun
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -287,19 +289,19 @@ private fun LiveCamera(vm: CameraViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Sun))
+            Box(Modifier.size(6.dp).clip(CircleShape).background(Rust))
             Spacer(Modifier.width(8.dp))
             Text(
                 text = tr("对准它，让它待在框中间", "Keep it centered in the frame"),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.bodyMedium.copy(letterSpacing = 1.sp),
+                color = Color.White.copy(alpha = 0.85f),
             )
         }
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
@@ -336,7 +338,7 @@ private fun LiveCamera(vm: CameraViewModel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(tr("需要相机权限才能拍照", "Camera access is needed"), color = Color.White.copy(alpha = 0.7f))
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }) { Text(tr("允许使用相机", "Allow camera")) }
+                    PillButton(tr("允许使用相机", "Allow camera"), primary = true) { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }
                 }
             }
             ViewfinderCorners(Modifier.fillMaxSize())
@@ -410,10 +412,10 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
                 scaleX = press.value
                 scaleY = press.value
             }
-            .border(4.dp, Sun, CircleShape)
-            .padding(7.dp)
+            .border(2.5.dp, if (enabled) Rust else Rust.copy(alpha = 0.4f), CircleShape)
+            .padding(6.dp)
             .clip(CircleShape)
-            .background(if (enabled) Color.White else Color.White.copy(alpha = 0.3f))
+            .background(if (enabled) Card else Card.copy(alpha = 0.3f))
             .clickable(enabled = enabled) {
                 scope.launch {
                     press.animateTo(0.86f, tween(70))
@@ -423,7 +425,7 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(16.dp).clip(CircleShape).background(Sun))
+        Box(Modifier.size(54.dp).border(0.8.dp, Rust.copy(alpha = 0.35f), CircleShape))
     }
 }
 
@@ -431,25 +433,24 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
 private fun SideButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.1f))
+            .clip(RoundedCornerShape(2.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = label, tint = Color.White)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f))
+        Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(22.dp))
+        Text(label, modifier = Modifier.padding(top = 3.dp), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp), color = Color.White.copy(alpha = 0.7f))
     }
 }
 
-/** White L-shaped brackets in the four corners of the viewfinder. */
+/** Thin white L-shaped brackets in the four corners of the viewfinder. */
 @Composable
 private fun ViewfinderCorners(modifier: Modifier) {
     Box(
         modifier.drawWithContent {
             val inset = 20.dp.toPx()
-            val len = 28.dp.toPx()
-            val stroke = 3.dp.toPx()
+            val len = 22.dp.toPx()
+            val stroke = 1.5.dp.toPx()
             val corners = listOf(
                 Offset(inset, inset) to Offset(1f, 1f),
                 Offset(size.width - inset, inset) to Offset(-1f, 1f),
@@ -457,15 +458,15 @@ private fun ViewfinderCorners(modifier: Modifier) {
                 Offset(size.width - inset, size.height - inset) to Offset(-1f, -1f),
             )
             for ((corner, dir) in corners) {
-                drawLine(Color.White, corner, corner + Offset(len * dir.x, 0f), stroke, StrokeCap.Round)
-                drawLine(Color.White, corner, corner + Offset(0f, len * dir.y), stroke, StrokeCap.Round)
+                drawLine(Color.White.copy(alpha = 0.85f), corner, corner + Offset(len * dir.x, 0f), stroke, StrokeCap.Square)
+                drawLine(Color.White.copy(alpha = 0.85f), corner, corner + Offset(0f, len * dir.y), stroke, StrokeCap.Square)
             }
         },
     )
 }
 
-/** Sap green washed most of the way to paper: reads as light on the dimmed photo. */
-private val ScanTint = lerp(WashSap, Paper, 0.6f)
+/** White card stock: reads as light on the dimmed photo. Rust marks the scan line and the pick. */
+private val ScanTint = Card
 
 /**
  * While SAM works: the photo dims and a single scan line combs down it,
@@ -518,7 +519,7 @@ private fun FindingSubject(vm: CameraViewModel, photo: Bitmap) {
                     scaleX = sc
                     scaleY = sc
                 }
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .drawWithContent {
                     drawContent()
                     val w = size.width
@@ -542,18 +543,18 @@ private fun FindingSubject(vm: CameraViewModel, photo: Bitmap) {
                             }
                         }
                         drawRect(
-                            Brush.verticalGradient(listOf(Color.Transparent, ScanTint.copy(alpha = 0.22f * fade)), startY = y - band, endY = y),
+                            Brush.verticalGradient(listOf(Color.Transparent, ScanTint.copy(alpha = 0.12f * fade)), startY = y - band, endY = y),
                             topLeft = Offset(0f, y - band),
                             size = Size(w, band),
                         )
-                        drawRect(Color.White.copy(alpha = 0.95f * fade), topLeft = Offset(0f, y - 1.dp.toPx()), size = Size(w, 2.dp.toPx()))
+                        drawRect(Rust.copy(alpha = 0.95f * fade), topLeft = Offset(0f, y - 0.75.dp.toPx()), size = Size(w, 1.5.dp.toPx()))
                     }
 
                     layerImages.forEachIndexed { i, img ->
                         val a = layerAlpha.getOrNull(i)?.value ?: 0f
                         if (a > 0f) {
-                            val tint = if (i == chosen) Color.White else ScanTint
-                            drawImage(img, dstSize = dst, alpha = a, colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn))
+                            val tint = if (i == chosen) Rust else ScanTint
+                            drawImage(img, dstSize = dst, alpha = if (i == chosen) a else a * 0.7f, colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn))
                         }
                     }
                 },
@@ -575,16 +576,15 @@ private fun FindingSubject(vm: CameraViewModel, photo: Bitmap) {
 private fun HintChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(Paper.copy(alpha = 0.92f))
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .specimenCard()
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Forest, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = Soft, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, color = Forest, style = MaterialTheme.typography.bodyMedium)
+        Text(text, color = Pine, style = MaterialTheme.typography.bodyMedium.copy(letterSpacing = 0.5.sp))
     }
 }
 
@@ -623,8 +623,8 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
             modifier = Modifier.fillMaxSize().blur(28.dp * separate.value),
             contentScale = ContentScale.Crop,
         )
-        Box(Modifier.fillMaxSize().background(Paper.copy(alpha = 0.5f * separate.value)))
-        // One quiet burst as the sticker pops: a few white and ochre glints.
+        Box(Modifier.fillMaxSize().background(Celadon.copy(alpha = 0.6f * separate.value)))
+        // One quiet burst as the sticker pops: a few small white and rust dots.
         Canvas(Modifier.fillMaxSize()) {
             val t = burst.value
             if (t <= 0f || t >= 1f) return@Canvas
@@ -634,8 +634,8 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
                 val angle = (k / 7f) * 2f * kotlin.math.PI.toFloat() + 0.4f
                 val dist = base + size.minDimension * 0.16f * t
                 val p = c + Offset(kotlin.math.cos(angle), kotlin.math.sin(angle)) * dist
-                val r = (if (k % 2 == 0) 5.dp else 3.5.dp).toPx() * (1f - t * 0.5f)
-                val color = if (k % 3 == 0) Sun else Color.White
+                val r = (if (k % 2 == 0) 3.dp else 2.dp).toPx() * (1f - t * 0.5f)
+                val color = if (k % 3 == 0) Rust else Color.White
                 drawCircle(color, radius = r, center = p, alpha = 1f - t)
             }
         }
@@ -659,7 +659,7 @@ private fun StickerReveal(stage: CameraStage.Sticker, vm: CameraViewModel) {
                     alpha = fade.value
                     cameraDistance = 12f * density.density
                 }
-                .holographic(intensity = 0.45f, trigger = lift.value > 1f)
+                .holographic(intensity = 0.4f, trigger = lift.value > 1f)
                 .pointerInputPeel(
                     enabled = !flying,
                     onStart = { scope.launch { lift.animateTo(1.08f, spring(stiffness = Spring.StiffnessMedium)) } },
@@ -764,112 +764,154 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
     }
 }
 
-/** "Saved to your collection", then the recognised name fades in. */
+/**
+ * "Saved to your collection", then the recognised name fades in. The sticker
+ * is mounted on a white specimen sheet with tape and a date stamp.
+ */
 @Composable
 private fun SavedCard(captureId: String, vm: CameraViewModel, onOpenCapture: (String) -> Unit) {
     val capture by remember(captureId) { vm.observeCapture(captureId) }.collectAsState(initial = null)
     val captureRepo = rememberContainer().captures
     val allCaptures by remember(captureRepo) { captureRepo.observeAll() }.collectAsState(initial = null)
     val enter = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)) }
 
-    Box(Modifier.fillMaxSize().background(Paper).paperGrain(), contentAlignment = Alignment.Center) {
+    // This species' place in the collection, counted by when each species was first seen.
+    val speciesNumber = remember(allCaptures, capture?.nameZh) {
+        val current = capture
+        val all = allCaptures
+        if (current == null || all == null || current.nameZh.isNullOrBlank()) {
+            null
+        } else {
+            all.filter { !it.nameZh.isNullOrBlank() }
+                .groupBy { speciesKey(it) }
+                .map { (key, list) -> key to list.minOf { it.createdAt } }
+                .sortedBy { it.second }
+                .map { it.first }
+                .indexOf(speciesKey(current))
+                .takeIf { it >= 0 }
+                ?.plus(1)
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(Celadon).paperGrain(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier
                 .graphicsLayer {
-                    scaleX = 0.8f + 0.2f * enter.value
-                    scaleY = 0.8f + 0.2f * enter.value
                     alpha = enter.value
-                    translationY = (1f - enter.value) * 120f
+                    translationY = (1f - enter.value) * 60f
                 }
-                .padding(24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // No card: the sticker sits on a watercolour wash tinted by its category.
-            capture?.let { c ->
-                Box(Modifier.size(260.dp), contentAlignment = Alignment.Center) {
-                    WatercolorWash(
-                        washFor(Category.fromKey(c.category)),
-                        seed = captureId.hashCode(),
-                        modifier = Modifier.fillMaxSize(),
-                        strength = 1.3f,
-                    )
-                    StickerImage(c, Modifier.size(180.dp).holographic(0.3f, 3200))
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(tr("已收入图鉴", "Added to collection"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            val c = capture
-            val waiting = c == null || c.status == RecognitionStatus.PENDING || c.status == RecognitionStatus.RUNNING
-            if (waiting) {
-                val error = c?.errorMessage
-                if (error != null) {
-                    Text(
-                        tr("$error，联网或设置好后会自动识别", "$error. Will identify once online or set up"),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                        Text(tr("正在识别…", "Identifying…"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .specimenCard()
+                    .tapedCorners(captureId.hashCode())
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+            ) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                        capture?.let { c -> StickerImage(c, Modifier.size(190.dp).holographic(0.3f, 3200)) }
                     }
-                }
-            } else if (c != null && c.status == RecognitionStatus.FAILED) {
-                Text(
-                    c.errorMessage ?: tr("没认出来，可以在详情里手动填名字", "Not recognized. Add a name in details"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            } else if (c != null) {
-                val reveal = remember { Animatable(0f) }
-                LaunchedEffect(Unit) { reveal.animateTo(1f, tween(500)) }
-                Column(Modifier.alpha(reveal.value), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        c.displayName,
-                        style = MaterialTheme.typography.displaySmall.copy(fontFamily = TitleFont),
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                    )
-                    c.nameSci?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(it.uppercase(), style = LatinStyle, color = TextMuted, textAlign = TextAlign.Center)
-                    }
-                    val category = Category.fromKey(c.category)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${category.emoji} ${category.display}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    c.description?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    // A new species that crosses a category milestone gets one quiet line.
-                    val unlock = remember(allCaptures, c) {
-                        allCaptures?.let { io.github.wgd753.naturecollect.ui.achievements.tierUnlockedBy(it, c) }
-                    }
-                    unlock?.let { u ->
-                        val fade = remember(u) { Animatable(0f) }
-                        LaunchedEffect(u) { fade.animateTo(1f, tween(600)) }
+                    Spacer(Modifier.height(12.dp))
+                    // Herbarium-style label in a thin bordered box.
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, LabelBorder)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
                         Text(
-                            "${u.category.emoji} ${u.category.display} · " + tr("解锁 ${u.tier} 种", "${u.tier} species"),
-                            modifier = Modifier.padding(top = 12.dp).alpha(fade.value),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            tr("已收入图鉴", "Added to collection"),
+                            style = MonoStyle,
+                            color = Soft,
                         )
+                        Spacer(Modifier.height(6.dp))
+                        SavedLabelBody(capture, speciesNumber, allCaptures)
                     }
+                }
+                capture?.let { c ->
+                    DateStamp(c.createdAt, Modifier.align(Alignment.TopEnd), size = 60.dp)
                 }
             }
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { onOpenCapture(captureId) }) { Text(tr("查看详情", "View details")) }
-                Button(
-                    onClick = vm::reset,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text(tr("继续拍", "Keep shooting")) }
+                PillButton(tr("查看详情", "View details")) { onOpenCapture(captureId) }
+                PillButton(tr("继续拍", "Keep shooting"), primary = true, onClick = vm::reset)
+            }
+        }
+    }
+}
+
+/** Name, scientific name and category on the saved sheet's label, or the identifying state. */
+@Composable
+private fun SavedLabelBody(
+    capture: io.github.wgd753.naturecollect.data.db.CaptureEntity?,
+    speciesNumber: Int?,
+    allCaptures: List<io.github.wgd753.naturecollect.data.db.CaptureEntity>?,
+) {
+    val c = capture
+    val waiting = c == null || c.status == RecognitionStatus.PENDING || c.status == RecognitionStatus.RUNNING
+    if (waiting) {
+        val error = c?.errorMessage
+        if (error != null) {
+            Text(
+                tr("$error，联网或设置好后会自动识别", "$error. Will identify once online or set up"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Soft,
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = Rust)
+                Spacer(Modifier.width(8.dp))
+                Text(tr("正在识别…", "Identifying…"), style = MaterialTheme.typography.bodyMedium, color = Soft)
+            }
+        }
+    } else if (c != null && c.status == RecognitionStatus.FAILED) {
+        Text(
+            c.errorMessage ?: tr("没认出来，可以在详情里手动填名字", "Not recognized. Add a name in details"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Soft,
+        )
+    } else if (c != null) {
+        val reveal = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { reveal.animateTo(1f, tween(500)) }
+        Column(Modifier.alpha(reveal.value)) {
+            val category = Category.fromKey(c.category)
+            Text(
+                listOfNotNull(speciesNumber?.let { "No.%03d".format(it) }, category.display).joinToString(" · "),
+                style = MonoStyle,
+                color = Soft,
+            )
+            Text(
+                c.displayName,
+                modifier = Modifier.padding(top = 2.dp),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, letterSpacing = 2.4.sp),
+                color = Pine,
+            )
+            c.nameSci?.let {
+                Text(it, style = MonoStyle, color = Soft)
+            }
+            c.description?.let {
+                Hairline(Modifier.padding(vertical = 6.dp), color = Divider)
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = Pine)
+            }
+            // A new species that crosses a category milestone gets one quiet line.
+            val unlock = remember(allCaptures, c) {
+                allCaptures?.let { io.github.wgd753.naturecollect.ui.achievements.tierUnlockedBy(it, c) }
+            }
+            unlock?.let { u ->
+                val fade = remember(u) { Animatable(0f) }
+                LaunchedEffect(u) { fade.animateTo(1f, tween(600)) }
+                Text(
+                    "${u.category.display} · " + tr("解锁 ${u.tier} 种", "${u.tier} species"),
+                    modifier = Modifier.padding(top = 8.dp).alpha(fade.value),
+                    style = MonoStyle,
+                    color = Rust,
+                )
             }
         }
     }
@@ -882,11 +924,9 @@ private fun FailedMessage(message: String, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("😵", style = MaterialTheme.typography.displaySmall)
-        Spacer(Modifier.height(12.dp))
-        Text(message, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text(tr("再试一次", "Try again")) }
+        Text(message, textAlign = TextAlign.Center, color = Soft)
+        Spacer(Modifier.height(20.dp))
+        PillButton(tr("再试一次", "Try again"), primary = true, onClick = onRetry)
     }
 }
 
@@ -906,8 +946,8 @@ private fun ZoomPresets(current: Float, min: Float, max: Float, modifier: Modifi
     val active = presets.minByOrNull { kotlin.math.abs(it - current) }
     Row(
         modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.35f))
+            .clip(RoundedCornerShape(2.dp))
+            .background(Night.copy(alpha = 0.45f))
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -924,14 +964,14 @@ private fun ZoomPresets(current: Float, min: Float, max: Float, modifier: Modifi
                 Modifier
                     .size(size)
                     .clip(CircleShape)
-                    .background(if (selected) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.18f))
+                    .background(if (selected) Card.copy(alpha = 0.92f) else Color.Transparent)
                     .clickable { onSelect(preset) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
-                    color = if (selected) Color.Black else Color.White,
-                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) Pine else Color.White,
+                    style = MonoStyle,
                 )
             }
         }

@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,12 +37,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.LabelBorder
+import io.github.wgd753.naturecollect.ui.theme.Pine
+
+private val Swatch = RoundedCornerShape(2.dp)
 
 /** A handful of starting points; anything else comes from the picker. */
-// Paper and the sketchbook inks first, then a few brighter pigments and pale papers.
+// The specimen palette first (pine, soft, rust, card stock), then the page,
+// water, linen and label tones, and a few plain inks.
 val QuickColors = listOf(
-    0xFFF8F9F4, 0xFF3F5A48, 0xFF2F4639, 0xFF5C7350, 0xFF3D7DCA, 0xFF9B5BD6,
-    0xFFE4574A, 0xFFE58A1F, 0xFFFFFFFF, 0xFFF6EBD9, 0xFFEEF3EC, 0xFFEDEFE6,
+    0xFF22392F, 0xFF6F8277, 0xFFB4532E, 0xFFFBFBF7, 0xFFE2EBE3, 0xFFC9DCD5,
+    0xFFE2DBC4, 0xFF9FB0A4, 0xFFFFFFFF, 0xFF1F2421, 0xFF3D6E9C, 0xFFC8963E,
 )
 
 /**
@@ -76,7 +80,7 @@ fun ColorPicker(color: Long, onChange: (Long) -> Unit, modifier: Modifier = Modi
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.6f)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .drawBehind {
                     drawRect(Brush.horizontalGradient(listOf(Color.White, pure)))
                     drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
@@ -110,7 +114,7 @@ fun ColorPicker(color: Long, onChange: (Long) -> Unit, modifier: Modifier = Modi
             Modifier
                 .fillMaxWidth()
                 .height(26.dp)
-                .clip(RoundedCornerShape(13.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .drawBehind {
                     drawRect(Brush.horizontalGradient(List(7) { Color.hsv(it * 60f % 360f, 1f, 1f) }.let { it + Color.hsv(359f, 1f, 1f) }))
                     val x = hue / 360f * size.width
@@ -135,9 +139,9 @@ fun ColorPicker(color: Long, onChange: (Long) -> Unit, modifier: Modifier = Modi
                 Box(
                     Modifier
                         .size(30.dp)
-                        .clip(CircleShape)
+                        .clip(Swatch)
                         .background(Color(c))
-                        .border(if (c == color) 3.dp else 1.dp, if (c == color) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.12f), CircleShape)
+                        .border(if (c == color) 2.dp else 1.dp, if (c == color) Pine else Color.Black.copy(alpha = 0.12f), Swatch)
                         .clickable { set(c) },
                 )
             }
@@ -153,7 +157,7 @@ fun ColorPickerDialog(initial: Long, title: String, onDismiss: () -> Unit, onPic
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(26.dp).clip(CircleShape).background(Color(color)).border(1.dp, Color.Black.copy(alpha = 0.12f), CircleShape))
+                Box(Modifier.size(26.dp).clip(Swatch).background(Color(color)).border(1.dp, Color.Black.copy(alpha = 0.12f), Swatch))
                 Spacer(Modifier.width(10.dp))
                 Text(title)
             }
@@ -164,19 +168,20 @@ fun ColorPickerDialog(initial: Long, title: String, onDismiss: () -> Unit, onPic
     )
 }
 
-/** A colour dot that opens the picker. */
+/** A colour swatch in a thin label-border frame that opens the picker. */
 @Composable
 fun ColorSwatchButton(color: Long, title: String, onPick: (Long) -> Unit, size: androidx.compose.ui.unit.Dp = 32.dp) {
     var open by remember { mutableStateOf(false) }
     Box(
         Modifier
             .size(size)
-            .clip(CircleShape)
-            .background(Brush.sweepGradient(List(7) { Color.hsv(it * 60f % 360f, 0.8f, 1f) }))
+            .clip(Swatch)
+            .background(Card)
+            .border(1.dp, LabelBorder, Swatch)
             .clickable { open = true },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(size - 8.dp).clip(CircleShape).background(Color(color)).border(1.dp, Color.White, CircleShape))
+        Box(Modifier.size(size - 10.dp).background(Color(color)))
     }
     if (open) {
         ColorPickerDialog(color, title, onDismiss = { open = false }) {

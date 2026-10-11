@@ -141,7 +141,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import coil3.compose.AsyncImage
 import io.github.wgd753.naturecollect.ui.camera.loadBitmap
 import io.github.wgd753.naturecollect.ui.cutout.CutoutDialog
-import io.github.wgd753.naturecollect.ui.theme.Paper
 import java.util.UUID
 import io.github.wgd753.naturecollect.data.db.BoardEntity
 import io.github.wgd753.naturecollect.data.db.BoardItemEntity
@@ -154,15 +153,19 @@ import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.theme.Card
-import io.github.wgd753.naturecollect.ui.theme.InkSoft
-import io.github.wgd753.naturecollect.ui.theme.HandFont
-import io.github.wgd753.naturecollect.ui.theme.HandInk
+import io.github.wgd753.naturecollect.ui.theme.Celadon
+import io.github.wgd753.naturecollect.ui.theme.LabelBorder
+import io.github.wgd753.naturecollect.ui.theme.MonoFont
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
+import io.github.wgd753.naturecollect.ui.TapeStrip
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.RectangleShape
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.nativeCanvas
 import io.github.wgd753.naturecollect.ui.paperGrain
-import io.github.wgd753.naturecollect.ui.washFor
-import io.github.wgd753.naturecollect.ui.watercolorWash
-import io.github.wgd753.naturecollect.ui.tint
-import io.github.wgd753.naturecollect.ui.collection.rememberStickerTint
-import io.github.wgd753.naturecollect.data.Category
 import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -214,7 +217,7 @@ fun BoardScreen() {
             onDismissRequest = { fullscreen = false },
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
-            Box(Modifier.fillMaxSize().background(Paper).systemBarsPadding()) { editor(true) }
+            Box(Modifier.fillMaxSize().background(Celadon).systemBarsPadding()) { editor(true) }
         }
     }
 }
@@ -239,7 +242,7 @@ private fun BoardEditor(
     val captureById = remember(captures) { captures.associateBy { it.id } }
     var selectedItemId by remember(board.id) { mutableStateOf<String?>(null) }
     var tool by remember { mutableStateOf(Tool.MOVE) }
-    var penColor by remember { mutableLongStateOf(HandInk.toArgb().toLong() and 0xFFFFFFFFL) }
+    var penColor by remember { mutableLongStateOf(Pine.toArgb().toLong() and 0xFFFFFFFFL) }
     var penWidth by remember { mutableFloatStateOf(4f) }
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     var showTextDialog by remember { mutableStateOf(false) }
@@ -298,8 +301,9 @@ private fun BoardEditor(
             BoxWithConstraints(
                 Modifier
                     .aspectRatio(3f / 4f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                    // A sheet of card stock on the celadon page; square corners, faint shadow.
+                    .shadow(1.dp, RectangleShape, ambientColor = SheetShadow, spotColor = SheetShadow)
+                    .clip(RectangleShape)
                     .drawWithContent {
                         exportLayer.record { this@drawWithContent.drawContent() }
                         drawLayer(exportLayer)
@@ -315,6 +319,8 @@ private fun BoardEditor(
                         .fillMaxSize()
                         .pointerInput(board.id) { detectTapGestures { selectedItemId = null } },
                 )
+                // Small rust maker's stamp; part of the sheet, so it is saved with the image too.
+                CollectStamp(Modifier.align(Alignment.BottomEnd).padding(12.dp))
                 items.filter { it.type == BoardItemType.DRAWING }.forEach { drawing ->
                     DrawingItem(drawing, widthPx, heightPx)
                 }
@@ -414,7 +420,7 @@ private fun BoardEditor(
     }
 
     if (sheet != null) {
-        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = Paper) {
+        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = Card) {
             when (sheet) {
                 Sheet.STICKERS -> LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
@@ -427,8 +433,7 @@ private fun BoardEditor(
                         Box(
                             Modifier
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                                .border(1.dp, LabelBorder, RectangleShape)
                                 .clickable {
                                     sheet = null
                                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -442,7 +447,6 @@ private fun BoardEditor(
                         Box(
                             Modifier
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(16.dp))
                                 .clickable {
                                     sheet = null
                                     addSticker(capture)
@@ -495,13 +499,13 @@ private fun RowScope.BarTool(icon: ImageVector, label: String, onClick: () -> Un
     Column(
         Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(2.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = null, tint = Pine)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Soft)
     }
 }
 
@@ -520,11 +524,11 @@ private fun BoardSwitcher(
     var confirmDelete by remember { mutableStateOf(false) }
     Box {
         Row(
-            Modifier.clip(RoundedCornerShape(14.dp)).clickable { open = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+            Modifier.clip(RoundedCornerShape(2.dp)).clickable { open = true }.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(board.name, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground, maxLines = 1)
-            Icon(Icons.Outlined.ExpandMore, contentDescription = tr("切换画板", "Switch board"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(spaced(board.name), style = MaterialTheme.typography.headlineSmall, color = Pine, maxLines = 1)
+            Icon(Icons.Outlined.ExpandMore, contentDescription = tr("切换画板", "Switch board"), tint = Soft)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             boards.forEach { b ->
@@ -584,17 +588,22 @@ private fun BoardSwitcher(
     }
 }
 
-/** Text fonts, stored by key on the item; "hand" (and anything older) is the handwriting face. */
+/**
+ * Text fonts, stored by key on the item. There is no handwriting face any more:
+ * "hand" (the default, and anything older) is the system sans; "mono" is the
+ * label face; "round" and "serif" are kept as system families for older items.
+ */
 private fun fontFor(key: String?): FontFamily = when (key) {
+    "mono" -> MonoFont
     "round" -> FontFamily.SansSerif
     "serif" -> FontFamily.Serif
-    else -> HandFont
+    else -> FontFamily.Default
 }
 
-/** The handwriting face has a single weight, so only the others get bold. */
 private fun weightFor(key: String?): FontWeight = when (key) {
     "round", "serif" -> FontWeight.Bold
-    else -> FontWeight.Normal
+    "mono" -> FontWeight.Normal
+    else -> FontWeight.Medium
 }
 
 /**
@@ -634,6 +643,7 @@ private fun TransformableItem(
         else -> 0.5f
     }
     val widthDp = with(density) { baseWidthPx.toDp() }
+    val tapeAngle = remember(item.id) { Random(item.id.hashCode()).nextFloat() * 24f - 12f }
 
     Box(
         Modifier
@@ -685,28 +695,22 @@ private fun TransformableItem(
             ),
     ) {
         val outline = if (selected) {
-            Modifier.border(1.5.dp, InkSoft, RoundedCornerShape(8.dp))
+            Modifier.border(1.dp, Rust.copy(alpha = 0.6f), RectangleShape)
         } else {
             Modifier
         }
         when (item.type) {
             BoardItemType.STICKER -> {
-                // Each sticker sits on a soft wash of its own colour; overlapping ones pool together.
-                val wash = washFor(rememberStickerTint(capture!!, Category.fromKey(capture.category).tint))
-                Box(
-                    Modifier
-                        .width(widthDp * 1.3f)
-                        .height(widthDp * aspect * 1.3f)
-                        .watercolorWash(wash, item.id.hashCode(), strength = 0.9f),
-                    contentAlignment = Alignment.Center,
-                ) {
+                // Held on the sheet by a strip of linen tape across the top.
+                Box(contentAlignment = Alignment.TopCenter) {
                     StickerImage(
-                        capture,
+                        capture!!,
                         Modifier
                             .width(widthDp)
                             .height(widthDp * aspect)
                             .then(outline),
                     )
+                    TapeStrip(Modifier.offset(y = (-4).dp), angle = tapeAngle)
                 }
             }
             BoardItemType.TEXT -> Text(
@@ -717,14 +721,17 @@ private fun TransformableItem(
                 fontWeight = weightFor(item.pathData),
                 fontSize = 26.sp,
             )
-            BoardItemType.IMAGE -> AsyncImage(
-                model = container.media.file(item.text.orEmpty()),
-                contentDescription = null,
-                modifier = Modifier
-                    .width(widthDp)
-                    .height(widthDp * aspect)
-                    .then(outline),
-            )
+            BoardItemType.IMAGE -> Box(contentAlignment = Alignment.TopCenter) {
+                AsyncImage(
+                    model = container.media.file(item.text.orEmpty()),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .width(widthDp)
+                        .height(widthDp * aspect)
+                        .then(outline),
+                )
+                TapeStrip(Modifier.offset(y = (-4).dp), angle = tapeAngle)
+            }
             BoardItemType.DRAWING -> Unit
         }
     }
@@ -799,7 +806,7 @@ private fun DrawScope.drawStroke(points: List<Offset>, color: Color, widthDp: Fl
 
 private fun DrawScope.drawPattern(pattern: Int) {
     val step = 22.dp.toPx()
-    val color = Color(0x22000000)
+    val color = Pine.copy(alpha = 0.12f)
     when (pattern) {
         1 -> {
             var y = step
@@ -830,7 +837,7 @@ private fun DrawScope.drawPattern(pattern: Int) {
 @Composable
 private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Float) -> Unit) {
     var text by remember { mutableStateOf("") }
-    var color by remember { mutableLongStateOf(HandInk.toArgb().toLong() and 0xFFFFFFFFL) }
+    var color by remember { mutableLongStateOf(Pine.toArgb().toLong() and 0xFFFFFFFFL) }
     var font by remember { mutableStateOf("hand") }
     var size by remember { mutableFloatStateOf(1f) }
     AlertDialog(
@@ -848,7 +855,7 @@ private fun TextDialog(onDismiss: () -> Unit, onAdd: (String, Long, String, Floa
                     maxLines = 2,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("hand" to tr("手写", "Hand"), "round" to tr("圆体", "Round"), "serif" to tr("衬线", "Serif")).forEach { (key, label) ->
+                    listOf("hand" to tr("默认", "Sans"), "mono" to tr("等宽", "Mono"), "serif" to tr("衬线", "Serif")).forEach { (key, label) ->
                         FilterPill(label, selected = font == key) { font = key }
                     }
                 }
@@ -883,4 +890,27 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
         confirmButton = { TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text(tr("好", "OK")) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } },
     )
+}
+
+private val SheetShadow = Color(0x241E3228)
+
+/** Round rust "拾野 / 采集" stamp, tilted like it was pressed by hand. */
+@Composable
+private fun CollectStamp(modifier: Modifier = Modifier) {
+    Canvas(modifier.size(46.dp).rotate(-14f)) {
+        val color = Rust.copy(alpha = 0.8f)
+        val r = size.minDimension / 2
+        drawCircle(color, r - 1.dp.toPx(), style = Stroke(1.4.dp.toPx()))
+        drawCircle(color, r - 3.5.dp.toPx(), style = Stroke(0.6.dp.toPx()))
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color.toArgb()
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textSize = r * 0.36f
+        }
+        drawContext.canvas.nativeCanvas.apply {
+            drawText("拾野", center.x, center.y - r * 0.06f, paint)
+            drawText("采集", center.x, center.y + r * 0.40f, paint)
+        }
+    }
 }

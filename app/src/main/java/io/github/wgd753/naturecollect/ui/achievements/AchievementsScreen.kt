@@ -16,12 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,15 +35,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wgd753.naturecollect.data.Category
+import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.WatercolorWash
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.PaperDeep
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
+import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.tr
-import io.github.wgd753.naturecollect.ui.washFor
 
 /** Species milestones per nature category, plus a few cross-category ones. */
 @Composable
@@ -58,34 +59,35 @@ fun AchievementsScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Forest)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Pine)
             }
             Text(
-                tr("成就", "Achievements"),
+                spaced(tr("成就", "Achievements")),
                 style = MaterialTheme.typography.titleLarge,
-                color = Forest,
+                color = Pine,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                "${summary.earned}/${summary.total}",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextMuted,
-                modifier = Modifier.padding(end = 12.dp),
-            )
+            Row(Modifier.padding(end = 12.dp), verticalAlignment = Alignment.Bottom) {
+                Text("${summary.earned}", style = MonoStyle.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), color = Rust)
+                Text("/${summary.total}", style = MonoStyle.copy(fontSize = 12.sp), color = Soft, modifier = Modifier.padding(bottom = 1.dp))
+            }
         }
         Column(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            summary.categories.forEach { CategoryRow(it) }
-            Spacer(Modifier.height(6.dp))
-            HorizontalDivider(thickness = 0.5.dp, color = PaperDeep)
-            Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().specimenCard()) {
+                summary.categories.forEachIndexed { i, progress ->
+                    if (i > 0) Hairline(Modifier.padding(horizontal = 14.dp), color = Divider)
+                    CategoryRow(progress)
+                }
+            }
+            Column(Modifier.fillMaxWidth().specimenCard()) {
                 summary.extras.forEachIndexed { i, extra ->
-                    if (i > 0) HorizontalDivider(thickness = 0.5.dp, color = PaperDeep)
+                    if (i > 0) Hairline(Modifier.padding(horizontal = 14.dp), color = Divider)
                     ExtraRow(extra)
                 }
             }
@@ -96,71 +98,59 @@ fun AchievementsScreen(onBack: () -> Unit) {
 @Composable
 private fun CategoryRow(progress: CategoryProgress) {
     val category = progress.category
-    val wash = washFor(category)
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            WatercolorWash(wash, seed = category.key.hashCode(), modifier = Modifier.fillMaxSize())
-            Text(category.emoji, fontSize = 20.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(category.tint))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                category.display,
+                style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp),
+                color = Pine,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            Text(
+                tr("${progress.species} 种", "${progress.species} species"),
+                style = MonoStyle,
+                color = Soft,
+            )
         }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    category.display,
-                    fontFamily = TitleFont,
-                    fontSize = 16.sp,
-                    letterSpacing = 1.sp,
-                    color = Forest,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
-                Text(
-                    tr("${progress.species} 种", "${progress.species} species"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextMuted,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(Divider),
+        ) {
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(PaperDeep),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress.fraction)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(Forest),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                SpeciesTiers.forEach { tier ->
-                    val earned = progress.species >= tier
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(if (earned) Forest else Paper)
-                                .border(1.dp, if (earned) Forest else TextMuted.copy(alpha = 0.5f), CircleShape),
-                        )
-                        Text(
-                            "$tier",
-                            fontSize = 10.sp,
-                            lineHeight = 12.sp,
-                            color = if (earned) Forest else TextMuted.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.fraction)
+                    .background(Pine),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            SpeciesTiers.forEach { tier ->
+                val earned = progress.species >= tier
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (earned) Pine else Card)
+                            .border(1.dp, if (earned) Pine else Soft.copy(alpha = 0.5f), CircleShape),
+                    )
+                    Text(
+                        "$tier",
+                        style = MonoStyle.copy(fontSize = 9.sp, lineHeight = 12.sp, letterSpacing = 0.sp),
+                        color = if (earned) Pine else Soft.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
             }
         }
@@ -172,19 +162,19 @@ private fun ExtraRow(extra: ExtraAchievement) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             extra.title,
-            color = if (extra.done) Forest else TextMuted,
+            color = if (extra.done) Pine else Soft,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
         if (extra.done) {
-            Icon(Icons.Filled.Check, contentDescription = tr("已完成", "Done"), tint = Forest, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Check, contentDescription = tr("已完成", "Done"), tint = Pine, modifier = Modifier.size(18.dp))
         } else {
-            Text("${extra.current}/${extra.goal}", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+            Text("${extra.current}/${extra.goal}", style = MonoStyle, color = Soft)
         }
     }
 }

@@ -37,6 +37,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ml.SamPrompt
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
 import kotlin.math.hypot
 
 /**
@@ -72,7 +74,7 @@ fun SubjectPicker(
     Box(
         modifier
             .aspectRatio(bitmap.width.toFloat() / bitmap.height)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(2.dp))
             .pointerInput(bitmap) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -119,11 +121,11 @@ fun SubjectPicker(
                     if (erasingNow) {
                         // A soft wide trail the size of the eraser brush.
                         val brush = size.maxDimension * io.github.wgd753.naturecollect.ml.SamSegmenter.ERASER_WIDTH
-                        drawPath(path, Color(0x99E39A88), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        drawPath(path, Rust.copy(alpha = 0.5f), style = Stroke(brush, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         return@drawWithContent
                     }
-                    val width = 3.dp.toPx()
-                    drawPath(path, Color.Black.copy(alpha = 0.35f), style = Stroke(width + 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    val width = 2.dp.toPx()
+                    drawPath(path, Pine.copy(alpha = 0.45f), style = Stroke(width + 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                     drawPath(
                         path,
                         Color.White,
@@ -131,7 +133,7 @@ fun SubjectPicker(
                             width,
                             cap = StrokeCap.Round,
                             join = StrokeJoin.Round,
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f), dashPhase),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), dashPhase),
                         ),
                     )
                 }
@@ -139,6 +141,6 @@ fun SubjectPicker(
     ) {
         Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
         overlay?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize()) }
-        if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
+        if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White, strokeWidth = 2.dp)
     }
 }

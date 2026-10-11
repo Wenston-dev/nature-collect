@@ -1,6 +1,5 @@
 package io.github.wgd753.naturecollect.ui.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,25 +13,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
-import io.github.wgd753.naturecollect.ui.Lang
+import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.StickerImage
+import io.github.wgd753.naturecollect.ui.specimenCard
 import io.github.wgd753.naturecollect.ui.theme.Card
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
 import io.github.wgd753.naturecollect.ui.tr
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -45,12 +49,7 @@ import kotlin.math.roundToLong
  */
 @Composable
 internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: (String) -> Unit) {
-    val primary = MaterialTheme.colorScheme.primary
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val english = Lang.english
-    val format = remember(english) {
-        if (english) SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH) else SimpleDateFormat("yyyy.MM.dd", Locale.CHINA)
-    }
+    val format = remember { SimpleDateFormat("yyyy.MM.dd", Locale.ENGLISH) }
     // Places count only when at least two finds carry coordinates; ~100 m counts as the same spot.
     val located = siblings.filter { it.latitude != null && it.longitude != null }
     val places = if (located.size >= 2) {
@@ -62,23 +61,28 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
+            .specimenCard()
+            .padding(horizontal = 12.dp, vertical = 14.dp),
     ) {
-        Text(
-            tr("足迹 · ${siblings.size} 次", "Encounters · ${siblings.size}"),
-            style = MaterialTheme.typography.titleLarge.copy(fontFamily = TitleFont),
-            color = primary,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        if (places > 0) {
+        Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.Bottom) {
             Text(
-                tr("$places 个地点", if (places == 1) "1 place" else "$places places"),
-                style = MaterialTheme.typography.labelMedium,
-                color = muted,
-                modifier = Modifier.padding(horizontal = 4.dp),
+                spaced(tr("足迹", "Encounters")),
+                style = MaterialTheme.typography.titleLarge,
+                color = Pine,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                listOfNotNull(
+                    tr("${siblings.size} 次", "×${siblings.size}"),
+                    if (places > 0) tr("$places 个地点", if (places == 1) "1 place" else "$places places") else null,
+                ).joinToString(" · "),
+                style = MonoStyle,
+                color = Soft,
+                modifier = Modifier.padding(bottom = 3.dp),
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
+        Hairline(color = Divider)
         siblings.forEachIndexed { index, item ->
             val current = item.id == currentId
             val first = index == 0
@@ -87,8 +91,6 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
                 Modifier
                     .fillMaxWidth()
                     .height(IntrinsicSize.Min)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (current) primary.copy(alpha = 0.06f) else Color.Transparent)
                     .clickable(enabled = !current) { onOpen(item.id) }
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -101,15 +103,17 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
                         .drawBehind {
                             val x = size.width / 2
                             val mid = size.height / 2
-                            val line = primary.copy(alpha = 0.22f)
+                            val line = Pine.copy(alpha = 0.25f)
                             val stroke = 1.dp.toPx()
                             if (!first) drawLine(line, Offset(x, 0f), Offset(x, mid), stroke)
                             if (!last) drawLine(line, Offset(x, mid), Offset(x, size.height), stroke)
                             if (current) {
-                                drawCircle(primary, radius = 5.dp.toPx(), center = Offset(x, mid))
+                                drawCircle(Card, radius = 6.dp.toPx(), center = Offset(x, mid))
+                                drawCircle(Rust, radius = 5.dp.toPx(), center = Offset(x, mid), style = Stroke(1.5.dp.toPx()))
+                                drawCircle(Rust, radius = 2.dp.toPx(), center = Offset(x, mid))
                             } else {
                                 drawCircle(Card, radius = 4.dp.toPx(), center = Offset(x, mid))
-                                drawCircle(primary.copy(alpha = 0.45f), radius = 3.dp.toPx(), center = Offset(x, mid))
+                                drawCircle(Soft, radius = 3.dp.toPx(), center = Offset(x, mid))
                             }
                         },
                 )
@@ -119,15 +123,15 @@ internal fun Timeline(siblings: List<CaptureEntity>, currentId: String, onOpen: 
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                     Text(
                         format.format(Date(item.createdAt)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (current) primary else MaterialTheme.colorScheme.onSurface,
+                        style = MonoStyle.copy(fontSize = 12.sp),
+                        fontWeight = if (current) FontWeight.Medium else FontWeight.Normal,
+                        color = if (current) Pine else Soft,
                     )
                     item.placeName?.takeIf { it.isNotBlank() }?.let { place ->
                         Text(
                             place,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = muted,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                            color = Soft,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )

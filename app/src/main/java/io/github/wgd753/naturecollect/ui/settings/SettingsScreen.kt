@@ -50,12 +50,16 @@ import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.FilterPill
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.data.Settings
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.Hairline
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.HorizontalDivider
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,15 +101,16 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Pine)
             }
-            Text(tr("设置", "Settings"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(spaced(tr("设置", "Settings")), style = MaterialTheme.typography.headlineSmall, color = Pine)
         }
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Section(tr("物种识别", "Identification")) {
                 Text(
@@ -114,7 +119,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                         "Uses DeepSeek V4.1 Flash. Create an API key at platform.deepseek.com and paste it here. It's stored encrypted on this phone.",
                     ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Soft,
                 )
                 OutlinedTextField(
                     value = key,
@@ -154,7 +159,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     Text(
                         tr("任意 OpenAI 兼容接口", "Any OpenAI-compatible API"),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Soft,
                         modifier = Modifier.weight(1f),
                     )
                     if (customized) {
@@ -167,7 +172,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(colors = inkButton(), onClick = {
+                    Button(colors = inkButton(), shape = SquareButton, onClick = {
                         container.settings.setApiKey(key)
                         container.settings.setBaseUrl(baseUrl)
                         container.settings.setModel(model)
@@ -178,7 +183,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                         }
                         Toast.makeText(context, if (key.isBlank()) tr("已清除", "Cleared") else tr("已保存，开始识别待识别的收集", "Saved. Identifying pending finds"), Toast.LENGTH_SHORT).show()
                     }) { Text(tr("保存", "Save")) }
-                    OutlinedButton(onClick = {
+                    OutlinedButton(shape = SquareButton, onClick = {
                         scope.launch {
                             container.captures.unrecognized().forEach { container.captures.markPending(it.id) }
                             container.recognition.schedule()
@@ -192,9 +197,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 Text(
                     tr("添加或修改分类（emoji + 名字），拍照识别时 AI 会从这些分类里挑。", "Add or edit categories (emoji + name). AI picks from these when identifying."),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Soft,
                 )
-                OutlinedButton(onClick = onOpenCategories) { Text(tr("管理分类", "Manage categories")) }
+                OutlinedButton(shape = SquareButton, onClick = onOpenCategories) { Text(tr("管理分类", "Manage categories")) }
             }
 
             Section(tr("地图底图", "Map source")) {
@@ -202,7 +207,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 Text(
                     tr("高德底图在国内加载快；OpenStreetMap 适合在国外用。", "Amap is fast in mainland China; OpenStreetMap works better abroad."),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Soft,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterPill(tr("高德（国内）", "Amap (China)"), selected = source == Settings.MAP_AMAP) { container.settings.setMapSource(Settings.MAP_AMAP) }
@@ -222,14 +227,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                 Text(
                     tr("所有收集、贴纸和画板打包成一个 zip。换手机时导出，再在新手机上导入。", "Packs all finds, stickers and boards into one zip. Export it, then import on your new phone."),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Soft,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(colors = inkButton(), onClick = {
+                    Button(colors = inkButton(), shape = SquareButton, onClick = {
                         val stamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                         exportLauncher.launch(tr("拾野备份-$stamp.zip", "Shiye-backup-$stamp.zip"))
                     }) { Text(tr("导出备份", "Export")) }
-                    OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
+                    OutlinedButton(shape = SquareButton, onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }) {
                         Text(tr("导入备份", "Import"))
                     }
                 }
@@ -244,11 +249,11 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(tr("拾野", "Shiye"), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(spaced(tr("拾野", "Shiye")), style = MaterialTheme.typography.titleMedium, color = Pine)
                         Text(
                             "v" + runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MonoStyle,
+                            color = Soft,
                         )
                     }
                 }
@@ -258,7 +263,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
                         "Cutout: MobileSAM (runs on device, photos stay local)\nIdentification: DeepSeek V4.1 Flash (only the sticker is uploaded)\nMap: MapLibre + OpenFreeMap (OpenStreetMap data)",
                     ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Soft,
                 )
             }
             Spacer(Modifier.height(24.dp))
@@ -268,18 +273,21 @@ fun SettingsScreen(onBack: () -> Unit, onOpenCategories: () -> Unit) {
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    // No cards: sections sit on the paper, separated by a faint ink hairline.
-    Column(Modifier.fillMaxWidth()) {
-        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = TitleFont), color = Forest)
-            content()
-        }
+    // Each section is a sheet of white card stock on the celadon page.
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .specimenCard()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(spaced(title), style = MaterialTheme.typography.titleLarge, color = Pine)
+        Hairline(color = Divider)
+        content()
     }
 }
 
+private val SquareButton = RoundedCornerShape(2.dp)
+
 @Composable
-private fun inkButton(): ButtonColors = ButtonDefaults.buttonColors(containerColor = Forest, contentColor = Paper)
+private fun inkButton(): ButtonColors = ButtonDefaults.buttonColors(containerColor = Pine, contentColor = Card)

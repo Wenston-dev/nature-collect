@@ -64,7 +64,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -85,18 +84,20 @@ import io.github.wgd753.naturecollect.ui.EmptyState
 import io.github.wgd753.naturecollect.ui.HeaderIconButton
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.StickerImage
-import io.github.wgd753.naturecollect.ui.WatercolorWash
+import io.github.wgd753.naturecollect.ui.Hairline
 import io.github.wgd753.naturecollect.ui.achievements.achievementSummary
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.Sun
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
-import io.github.wgd753.naturecollect.ui.tint
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.tapedCorners
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.MonoFont
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
 import io.github.wgd753.naturecollect.ui.tr
-import io.github.wgd753.naturecollect.ui.washFor
-import io.github.wgd753.naturecollect.ui.watercolorWash
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -134,6 +135,10 @@ fun CollectionScreen(
         }.timeInMillis
     }
     val newThisMonth = groups.count { it.firstSeen >= monthStart && it.cover.nameZh != null }
+    // Catalogue numbers follow collection order: the first species found is No.001.
+    val catalogue = remember(groups) {
+        groups.sortedBy { it.firstSeen }.withIndex().associate { (i, g) -> g.key to i + 1 }
+    }
 
     BackHandler(enabled = selecting) { selected = emptySet() }
     // Drop selections that no longer exist (e.g. after deleting).
@@ -146,7 +151,7 @@ fun CollectionScreen(
             val title = filter?.let { tr("我的${it.display}图鉴", "My ${it.display}") } ?: tr("我的自然图鉴", "My nature collection")
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val poster = PosterRenderer(container.media, io.github.wgd753.naturecollect.export.CanvasWash.titleTypeface(context)).render(shown, title)
+                    val poster = PosterRenderer(container.media, io.github.wgd753.naturecollect.export.SpecimenCanvas.monoTypeface(context)).render(shown, title)
                     try {
                         Gallery.save(context, poster, tr("图鉴", "collection"), jpeg = true)
                     } finally {
@@ -176,10 +181,10 @@ fun CollectionScreen(
                     onDelete = { confirmDelete = true },
                 )
             } else {
-                PageHeader(tr("图鉴", "Collection")) {
+                PageHeader(spaced(tr("图鉴", "Collection"))) {
                     if (exporting) {
                         Box(Modifier.padding(start = 8.dp).size(42.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Forest)
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Pine)
                         }
                     } else {
                         HeaderIconButton(Icons.Outlined.FileDownload, tr("导出图鉴长图", "Export poster"), enabled = shown.isNotEmpty()) { export() }
@@ -195,8 +200,8 @@ fun CollectionScreen(
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             item(key = "hero", span = { GridItemSpan(maxLineSpan) }) {
@@ -214,8 +219,7 @@ fun CollectionScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .watercolorWash(Sun, seed = 41, strength = 0.7f)
+                            .specimenCard()
                             .clickable(onClick = onOpenSettings)
                             .padding(horizontal = 18.dp, vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -223,7 +227,7 @@ fun CollectionScreen(
                         Text(
                             tr("还没填 DeepSeek API Key，拍到的东西不会自动识别。点这里去设置", "No DeepSeek API key yet, so photos won't be identified. Tap to set it up"),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Forest,
+                            color = Pine,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -244,6 +248,7 @@ fun CollectionScreen(
                 val isSelected = group.key in selected
                 SpeciesCell(
                     group = group,
+                    number = catalogue[group.key],
                     selecting = selecting,
                     selected = isSelected,
                     modifier = Modifier.animateItem(),
@@ -289,14 +294,14 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, contentDescription = tr("取消选择", "Clear selection"), tint = Forest)
+            Icon(Icons.Outlined.Close, contentDescription = tr("取消选择", "Clear selection"), tint = Pine)
         }
-        Text(tr("已选 $count 个", "$count selected"), style = MaterialTheme.typography.titleLarge, color = Forest)
+        Text(tr("已选 $count 个", "$count selected"), style = MaterialTheme.typography.titleLarge, color = Pine)
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onSelectAll) { Text(tr("全选", "Select all"), color = Forest) }
+        TextButton(onClick = onSelectAll) { Text(tr("全选", "Select all"), color = Pine) }
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(50))
+                .clip(RoundedCornerShape(2.dp))
                 .clickable(onClick = onDelete)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -308,7 +313,7 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
     }
 }
 
-/** One line of big title-font numbers with small inline units, then a quiet achievements link. */
+/** Three stat columns between two hairlines, then a quiet achievements link. */
 @Composable
 private fun StatsLine(
     speciesCount: Int,
@@ -318,35 +323,35 @@ private fun StatsLine(
     achievementsTotal: Int,
     onOpenAchievements: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            AnimatedContent(
-                targetState = speciesCount,
-                transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
-                label = "speciesCount",
-            ) { n -> StatNumber("$n") }
-            StatUnit(tr("种", "species"))
-            Spacer(Modifier.width(18.dp))
-            StatNumber("$total")
-            StatUnit(tr("次遇见", "sightings"))
-            Spacer(Modifier.width(18.dp))
-            StatNumber("+$newThisMonth")
-            StatUnit(tr("本月", "this month"))
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp)) {
+        Hairline()
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            StatColumn(tr("种", "species")) {
+                AnimatedContent(
+                    targetState = speciesCount,
+                    transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
+                    label = "speciesCount",
+                ) { n -> StatNumber("$n") }
+            }
+            StatRule()
+            StatColumn(tr("次遇见", "sightings")) { StatNumber("$total") }
+            StatRule()
+            StatColumn(tr("本月新种", "new this month")) { StatNumber("+$newThisMonth") }
         }
+        Hairline()
         Row(
             Modifier
-                .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onOpenAchievements)
-                .padding(top = 6.dp, bottom = 4.dp, end = 4.dp),
+                .padding(top = 8.dp, bottom = 2.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(tr("成就", "Achievements"), color = TextMuted, style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.width(4.dp))
-            Text("$achievementsEarned/$achievementsTotal", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+            Text(tr("成就", "Achievements"), color = Soft, style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(6.dp))
+            Text("$achievementsEarned/$achievementsTotal", color = Soft, style = MonoStyle)
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = TextMuted,
+                tint = Soft,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -354,24 +359,28 @@ private fun StatsLine(
 }
 
 @Composable
-private fun StatNumber(value: String) {
-    Text(value, color = Forest, fontFamily = TitleFont, fontSize = 28.sp, lineHeight = 32.sp, letterSpacing = 0.5.sp)
+private fun androidx.compose.foundation.layout.RowScope.StatColumn(label: String, number: @Composable () -> Unit) {
+    Column(Modifier.weight(1f).padding(start = 10.dp, top = 6.dp, bottom = 5.dp)) {
+        number()
+        Text(label, color = Soft, fontSize = 10.sp, letterSpacing = 0.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 @Composable
-private fun StatUnit(label: String) {
-    Text(
-        label,
-        color = TextMuted,
-        fontSize = 11.sp,
-        modifier = Modifier.padding(start = 3.dp, bottom = 4.dp),
-    )
+private fun StatRule() {
+    Box(Modifier.width(0.5.dp).height(30.dp).background(Pine.copy(alpha = 0.2f)))
+}
+
+@Composable
+private fun StatNumber(value: String) {
+    Text(value, color = Pine, fontFamily = MonoFont, fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 23.sp)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SpeciesCell(
     group: SpeciesGroup,
+    number: Int?,
     selecting: Boolean,
     selected: Boolean,
     modifier: Modifier = Modifier,
@@ -379,18 +388,15 @@ private fun SpeciesCell(
     onLongClick: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    // A slight, stable tilt per species makes the grid feel hand-placed.
-    val tilt = ((group.key.hashCode() % 7) - 3) * 1.5f
     val appear = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)) }
     val press by animateFloatAsState(
-        targetValue = if (selected) 0.94f else 1f,
+        targetValue = if (selected) 0.96f else 1f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
         label = "selectScale",
     )
     val cover = group.cover
     val recognizing = cover.status == RecognitionStatus.PENDING || cover.status == RecognitionStatus.RUNNING
-    val wash = washFor(rememberStickerTint(cover, fallback = group.category.tint))
 
     Column(
         modifier = modifier
@@ -398,7 +404,9 @@ private fun SpeciesCell(
                 scaleX = press
                 scaleY = press
             }
-            .clip(RoundedCornerShape(20.dp))
+            .specimenCard()
+            .then(if (selected) Modifier.border(1.5.dp, Pine) else Modifier)
+            .tapedCorners(seed = group.key.hashCode())
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -411,70 +419,59 @@ private fun SpeciesCell(
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f),
+                .aspectRatio(1.1f),
         ) {
-            WatercolorWash(wash, seed = group.key.hashCode(), modifier = Modifier.fillMaxSize().padding(4.dp))
             StickerImage(
                 cover,
                 Modifier
                     .fillMaxSize()
-                    .padding(18.dp)
+                    .padding(start = 14.dp, end = 14.dp, top = 16.dp, bottom = 8.dp)
                     .graphicsLayer {
-                        rotationZ = if (selecting) 0f else tilt
                         scaleX = appear.value
                         scaleY = appear.value
                     },
             )
-            if (selected) {
-                // A thin ink ring around the wash marks the selection.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(2.dp)
-                        .border(1.5.dp, Forest, RoundedCornerShape(28.dp)),
-                )
-            }
             androidx.compose.animation.AnimatedVisibility(
                 visible = selecting,
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 8.dp),
                 enter = scaleIn() + fadeIn(),
                 exit = scaleOut() + fadeOut(),
             ) {
                 Box(
                     Modifier
-                        .size(22.dp)
+                        .size(20.dp)
                         .clip(CircleShape)
-                        .background(if (selected) Forest else Paper)
-                        .border(1.5.dp, if (selected) Forest else TextMuted, CircleShape),
+                        .background(if (selected) Rust else Card)
+                        .border(1.dp, if (selected) Rust else Soft, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (selected) Icon(Icons.Outlined.Check, contentDescription = tr("已选", "Selected"), tint = Paper, modifier = Modifier.size(14.dp))
+                    if (selected) Icon(Icons.Outlined.Check, contentDescription = tr("已选", "Selected"), tint = Card, modifier = Modifier.size(13.dp))
                 }
             }
         }
+        Hairline(Modifier.padding(horizontal = 8.dp), color = Divider)
         Row(
-            Modifier.padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.Bottom,
+            Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = if (recognizing && cover.nameZh == null) tr("识别中…", "Identifying…") else group.name,
-                fontFamily = TitleFont,
-                fontSize = 15.sp,
-                letterSpacing = 0.9.sp,
-                color = if (recognizing && cover.nameZh == null) TextMuted else Forest,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.6.sp,
+                color = if (recognizing && cover.nameZh == null) Soft else Pine,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f),
             )
-            if (group.captures.size > 1) {
-                Text(
-                    text = "×${group.captures.size}",
-                    color = TextMuted,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(start = 5.dp, bottom = 1.dp),
-                )
-            }
+            val meta = listOfNotNull(number?.let { "No.%03d".format(it) }, "×${group.captures.size}").joinToString(" · ")
+            Text(
+                text = meta,
+                style = MonoStyle.copy(fontSize = 9.sp, letterSpacing = 0.3.sp),
+                color = Soft,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 6.dp),
+            )
         }
     }
 }

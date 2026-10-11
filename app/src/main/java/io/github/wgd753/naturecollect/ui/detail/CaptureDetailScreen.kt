@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -28,11 +27,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import android.graphics.BitmapFactory
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.DropdownMenu
@@ -74,8 +70,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
@@ -83,26 +77,30 @@ import io.github.wgd753.naturecollect.data.db.RecognitionStatus
 import io.github.wgd753.naturecollect.ui.FilterPill
 import io.github.wgd753.naturecollect.ui.MediaImage
 import io.github.wgd753.naturecollect.ui.StickerImage
-import io.github.wgd753.naturecollect.ui.Tag
-import io.github.wgd753.naturecollect.ui.formatDate
 import io.github.wgd753.naturecollect.ui.holographic
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.tr
 import io.github.wgd753.naturecollect.ui.Lang
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.HandFont
-import io.github.wgd753.naturecollect.ui.theme.HandInk
-import io.github.wgd753.naturecollect.ui.theme.LatinStyle
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
-import io.github.wgd753.naturecollect.ui.washFor
-import io.github.wgd753.naturecollect.ui.watercolorWash
-import io.github.wgd753.naturecollect.ui.collection.rememberStickerTint
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.text.font.FontWeight
+import io.github.wgd753.naturecollect.export.SpecimenCanvas
+import io.github.wgd753.naturecollect.ui.DateStamp
+import io.github.wgd753.naturecollect.ui.Hairline
+import io.github.wgd753.naturecollect.ui.TapeStrip
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.LabelBorder
+import io.github.wgd753.naturecollect.ui.theme.MonoFont
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Soft
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -229,7 +227,7 @@ fun CaptureDetailScreen(
                             sharing = true
                             scope.launch {
                                 try {
-                                    ShareCard.share(context, container.media, c, speciesNumber)
+                                    ShareCard.share(context, container.media, c, speciesNumber, siblings.indexOfFirst { it.id == c.id }.takeIf { it >= 0 }?.let { siblings.size - it })
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Exception) {
@@ -284,117 +282,120 @@ fun CaptureDetailScreen(
         if (c == null) return@Column
 
         val category = Category.fromKey(c.category)
-        val wash = washFor(rememberStickerTint(c, category.tint))
-        val hairline = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        // Which encounter of this species this find is, oldest = 1.
+        val encounter = siblings.indexOfFirst { it.id == c.id }.takeIf { it >= 0 }?.let { siblings.size - it }
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 16.dp),
         ) {
-            AnimatedContent(targetState = showPhoto, label = "photoToggle") { photo ->
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .then(
-                            if (photo) {
-                                Modifier.clip(RoundedCornerShape(24.dp))
-                            } else {
-                                Modifier.watercolorWash(wash, c.id.hashCode(), strength = 1.3f)
-                            },
-                        )
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { showPhoto = !showPhoto },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (photo) {
-                        MediaImage(container.media.file(c.photoFile), Modifier.fillMaxSize())
-                    } else {
-                        // A small fixed tilt per capture, like a sticker pressed on by hand.
-                        val tilt = remember(c.id) { Random(c.id.hashCode()).nextFloat() * 8f - 4f }
-                        StickerImage(
-                            c,
-                            Modifier
-                                .fillMaxSize()
-                                .padding(36.dp)
-                                .graphicsLayer { rotationZ = tilt }
-                                .holographic(0.32f, 3000),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    c.displayName,
-                    fontFamily = TitleFont,
-                    fontSize = 32.sp,
-                    letterSpacing = 2.sp,
-                    color = Forest,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                IconButton(onClick = { editingName = true }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = tr("改名字", "Rename"), tint = TextMuted, modifier = Modifier.size(18.dp))
-                }
-            }
-            Text(
-                c.nameSci?.uppercase() ?: tr("还没有英文名 / 学名，点 ✎ 补充", "No English name yet. Tap ✎ to add"),
-                modifier = Modifier.clickable { editingName = true },
-                style = if (c.nameSci != null) LatinStyle else MaterialTheme.typography.labelMedium,
-                color = TextMuted,
-            )
-            Spacer(Modifier.height(12.dp))
-            RecognitionLine(c) { scope.launch { container.recognition.retry(c.id) } }
-            Text(
-                listOfNotNull(shortDate(c.createdAt), c.placeName?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                style = MaterialTheme.typography.labelMedium,
-                color = TextMuted,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
+            // One white sheet: the mounted sticker, its herbarium label and a date stamp.
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { editingDescription = true }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.Top,
+                    .padding(top = 4.dp)
+                    .specimenCard()
+                    .padding(16.dp),
             ) {
-                Text(
-                    c.description ?: tr("还没有简介，点这里写一句，或者让 AI 帮你写", "No description yet. Tap to write one, or let AI do it"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (c.description != null) Forest else TextMuted,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Outlined.Edit,
-                    contentDescription = tr("编辑简介", "Edit description"),
-                    tint = TextMuted,
-                    modifier = Modifier.padding(start = 8.dp, top = 2.dp).size(14.dp),
-                )
-            }
-            c.note?.takeIf { it.isNotBlank() }?.let { note ->
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    note,
-                    fontFamily = HandFont,
-                    fontSize = 22.sp,
-                    lineHeight = 30.sp,
-                    color = HandInk,
-                    modifier = Modifier.fillMaxWidth().clickable { editingNotes = true },
-                )
-            }
-            val alternatives = c.alternatives?.split('|')?.filter { it.isNotBlank() }.orEmpty()
-            if (alternatives.isNotEmpty() && c.status == RecognitionStatus.DONE) {
+                Box(Modifier.fillMaxWidth()) {
+                    AnimatedContent(targetState = showPhoto, label = "photoToggle") { photo ->
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { showPhoto = !showPhoto },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (photo) {
+                                MediaImage(container.media.file(c.photoFile), Modifier.fillMaxSize())
+                            } else {
+                                // A small fixed tilt per capture, like a specimen mounted by hand.
+                                val tilt = remember(c.id) { Random(c.id.hashCode()).nextFloat() * 8f - 4f }
+                                StickerImage(
+                                    c,
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(36.dp)
+                                        .graphicsLayer { rotationZ = tilt }
+                                        .holographic(0.32f, 3000),
+                                )
+                            }
+                        }
+                    }
+                    if (!showPhoto) {
+                        TapeStrip(Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 40.dp), angle = -30f)
+                        TapeStrip(Modifier.align(Alignment.TopEnd).padding(end = 84.dp, top = 32.dp), angle = 24f)
+                    }
+                    DateStamp(c.createdAt, Modifier.align(Alignment.TopEnd), size = 62.dp)
+                }
                 Spacer(Modifier.height(12.dp))
-                Text(tr("也可能是：", "Could also be:"), style = MaterialTheme.typography.labelMedium, color = TextMuted)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    alternatives.forEach { name ->
-                        FilterPill(name, selected = false) {
-                            renameWithUndo(c, name) {
-                                container.captures.rename(c.id, name, Category.fromKey(c.category), nameSci = null)
-                                container.recognition.fillDetails(c.id)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    RecognitionLine(
+                        c,
+                        modifier = Modifier.weight(0.38f).padding(end = 12.dp),
+                    ) { scope.launch { container.recognition.retry(c.id) } }
+                    HerbariumLabel(
+                        head = SpecimenCanvas.labelHead(speciesNumber, category),
+                        name = c.displayName,
+                        sci = c.nameSci?.takeIf { it.isNotBlank() },
+                        rows = listOfNotNull(
+                            tr("地点", "Place") to (c.placeName?.takeIf { it.isNotBlank() } ?: tr("未填写", "Not set")),
+                            tr("时间", "Time") to labelTime(c.createdAt),
+                            tr("坐标", "Coords") to (SpecimenCanvas.coordinates(c.latitude, c.longitude) ?: tr("没有位置信息", "No location")),
+                            encounter?.let { tr("遇见", "Seen") to tr("第 $it 次", "#$it") },
+                        ),
+                        onRename = { editingName = true },
+                        onEditNotes = { editingNotes = true },
+                        modifier = Modifier.weight(0.62f),
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Hairline(color = Divider)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { editingDescription = true }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        c.description ?: tr("还没有简介，点这里写一句，或者让 AI 帮你写", "No description yet. Tap to write one, or let AI do it"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (c.description != null) Pine else Soft,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = tr("编辑简介", "Edit description"),
+                        tint = Soft,
+                        modifier = Modifier.padding(start = 8.dp, top = 2.dp).size(14.dp),
+                    )
+                }
+                c.note?.takeIf { it.isNotBlank() }?.let { note ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        note,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Pine,
+                        modifier = Modifier.fillMaxWidth().clickable { editingNotes = true }.padding(vertical = 4.dp),
+                    )
+                }
+                val alternatives = c.alternatives?.split('|')?.filter { it.isNotBlank() }.orEmpty()
+                if (alternatives.isNotEmpty() && c.status == RecognitionStatus.DONE) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(tr("也可能是：", "Could also be:"), style = MaterialTheme.typography.labelMedium, color = Soft)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        alternatives.forEach { name ->
+                            FilterPill(name, selected = false) {
+                                renameWithUndo(c, name) {
+                                    container.captures.rename(c.id, name, Category.fromKey(c.category), nameSci = null)
+                                    container.recognition.fillDetails(c.id)
+                                }
                             }
                         }
                     }
@@ -402,19 +403,8 @@ fun CaptureDetailScreen(
             }
             if (siblings.size > 1) {
                 Spacer(Modifier.height(16.dp))
-                HorizontalDivider(thickness = 1.dp, color = hairline)
                 Timeline(siblings, currentId = c.id, onOpen = { if (it != c.id) onOpenCapture(it) })
             }
-            Spacer(Modifier.height(16.dp))
-            InfoCard(
-                rows = listOf(
-                    tr("时间", "Time") to formatDate(c.createdAt),
-                    tr("地点", "Place") to (c.placeName ?: tr("未填写", "Not set")),
-                    tr("坐标", "Coordinates") to (c.latitude?.let { "%.5f, %.5f".format(it, c.longitude) } ?: tr("没有位置信息", "No location")),
-                ),
-                hairline = hairline,
-                onEdit = { editingNotes = true },
-            )
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -496,65 +486,111 @@ fun CaptureDetailScreen(
     }
 }
 
+/** Category, recognition status and retry, stacked in the narrow space beside the label. */
 @Composable
-private fun RecognitionLine(capture: CaptureEntity, onRetry: () -> Unit) {
+private fun RecognitionLine(capture: CaptureEntity, modifier: Modifier = Modifier, onRetry: () -> Unit) {
     val category = Category.fromKey(capture.category)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Category as a small watercolour pill in its own wash.
-        Text(
-            category.display,
-            modifier = Modifier
-                .watercolorWash(washFor(category), category.key.hashCode(), strength = 1.6f)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = Forest,
-        )
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).background(category.tint, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(category.display, style = MaterialTheme.typography.labelMedium, color = Pine)
+        }
         val status = when (capture.status) {
             RecognitionStatus.DONE -> capture.confidence?.let { tr("把握 ${(it * 100).toInt()}%", "${(it * 100).toInt()}% sure") }
             RecognitionStatus.MANUAL -> tr("手动命名", "Named by hand")
             RecognitionStatus.PENDING, RecognitionStatus.RUNNING -> capture.errorMessage ?: tr("等待识别", "Waiting")
             RecognitionStatus.FAILED -> capture.errorMessage ?: tr("识别失败", "Not recognized")
         }
-        status?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = TextMuted) }
+        status?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = Soft, maxLines = 4) }
         if (capture.status == RecognitionStatus.FAILED || capture.status == RecognitionStatus.DONE ||
             (capture.status == RecognitionStatus.PENDING && capture.errorMessage != null)
         ) {
             IconButton(onClick = onRetry, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Outlined.Refresh, contentDescription = tr("重新识别", "Recognize again"), tint = TextMuted, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Refresh, contentDescription = tr("重新识别", "Recognize again"), tint = Soft, modifier = Modifier.size(16.dp))
             }
         }
     }
 }
 
-/** "10月11日 15:20" this year, with the year added for older finds. */
-private fun shortDate(millis: Long): String {
-    val locale = if (Lang.english) java.util.Locale.ENGLISH else java.util.Locale.CHINA
-    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
-    val sameYear = then.get(java.util.Calendar.YEAR) == java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-    val pattern = if (sameYear) tr("M月d日 HH:mm", "MMM d HH:mm") else tr("yyyy年M月d日 HH:mm", "MMM d, yyyy HH:mm")
-    return java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(millis))
-}
+/** "2026.10.11 15:20" for the label's mono time row. */
+private fun labelTime(millis: Long): String =
+    java.text.SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.ENGLISH).format(java.util.Date(millis))
 
+/**
+ * The herbarium label: mono catalogue line, spaced name, mono scientific name,
+ * a dashed rule, then label/value rows. Tapping the names renames; tapping the
+ * rows edits place and notes.
+ */
 @Composable
-private fun InfoCard(rows: List<Pair<String, String>>, hairline: Color, onEdit: () -> Unit) {
+private fun HerbariumLabel(
+    head: String,
+    name: String,
+    sci: String?,
+    rows: List<Pair<String, String>>,
+    onRename: () -> Unit,
+    onEditNotes: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onEdit),
+        modifier
+            .background(Color.White)
+            .border(1.dp, LabelBorder)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
     ) {
-        rows.forEachIndexed { i, (label, value) ->
-            HorizontalDivider(thickness = 1.dp, color = hairline)
-            Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, modifier = Modifier.padding(end = 16.dp), style = MaterialTheme.typography.bodyMedium, color = TextMuted)
-                Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Forest)
-                if (i == 0) {
-                    Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = TextMuted, modifier = Modifier.size(16.dp))
+        Text(head, style = MonoStyle, color = Soft)
+        Row(
+            Modifier.clickable(onClick = onRename),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                name,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 2.4.sp,
+                lineHeight = 26.sp,
+                color = Pine,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(Icons.Outlined.Edit, contentDescription = tr("改名字", "Rename"), tint = Soft, modifier = Modifier.padding(start = 4.dp).size(14.dp))
+        }
+        Text(
+            sci ?: tr("还没有英文名 / 学名", "No English name yet"),
+            modifier = Modifier.clickable(onClick = onRename),
+            style = if (sci != null) MonoStyle else MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+            color = Soft,
+        )
+        Spacer(Modifier.height(5.dp))
+        Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+            drawLine(
+                DashColor,
+                Offset(0f, size.height / 2),
+                Offset(size.width, size.height / 2),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 2.dp.toPx())),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Column(Modifier.fillMaxWidth().clickable(onClick = onEditNotes)) {
+            rows.forEachIndexed { i, (label, value) ->
+                Row(Modifier.padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp),
+                        color = Soft,
+                        modifier = Modifier.width(if (Lang.english) 44.dp else 30.dp),
+                    )
+                    Text(value, style = MonoStyle, color = Pine, modifier = Modifier.weight(1f))
+                    if (i == 0) {
+                        Icon(Icons.Outlined.Edit, contentDescription = tr("编辑", "Edit"), tint = Soft, modifier = Modifier.size(12.dp))
+                    }
                 }
             }
         }
-        HorizontalDivider(thickness = 1.dp, color = hairline)
     }
 }
+
+private val DashColor = Color(0xFFC4CFC6)
 
 private enum class NameField { ZH, SCI }
 
@@ -654,7 +690,7 @@ private fun RenameDialog(
                     },
                     label = { Text(tr("英文名 / 学名", "English name")) },
                     singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontStyle = FontStyle.Italic),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = MonoFont),
                     trailingIcon = { if (translating == NameField.SCI) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -675,7 +711,7 @@ private fun RenameDialog(
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Category.entries.forEach { option ->
-                        FilterPill("${option.emoji} ${option.display}", selected = option == category, tint = option.tint) {
+                        FilterPill(option.display, selected = option == category, tint = option.tint) {
                             category = option
                             categoryTouched = true
                         }
@@ -729,7 +765,7 @@ private fun DescriptionDialog(capture: CaptureEntity, onDismiss: () -> Unit, onS
                                 }
                             }
                         },
-                    ) { Text(tr("✨ 让 AI 写一句", "✨ Let AI write one")) }
+                    ) { Text(tr("让 AI 写一句", "Let AI write one")) }
                     if (writing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 status?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error) }

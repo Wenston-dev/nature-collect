@@ -30,6 +30,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import io.github.wgd753.naturecollect.ui.FilterPill
+import io.github.wgd753.naturecollect.ui.activeUnderline
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Divider
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.sp
 import io.github.wgd753.naturecollect.ui.tr
 
 /**
@@ -42,12 +50,12 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
     Text(
         text = if (state.erasing) tr("涂抹要擦掉的部分", "Paint over what to erase") else tr("圈出或点选", "Circle or tap"),
         modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 6.dp),
-        style = MaterialTheme.typography.titleMedium,
-        color = if (state.erasing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.bodyMedium.copy(letterSpacing = 1.sp),
+        color = if (state.erasing) Rust else Soft,
     )
     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
         when {
-            state.error != null -> Text(tr("抠图失败：${state.error}", "Cutout failed: ${state.error}"), color = MaterialTheme.colorScheme.error)
+            state.error != null -> Text(tr("抠图失败：${state.error}", "Cutout failed: ${state.error}"), color = Rust)
             else -> SubjectPicker(
                 bitmap = state.image.bitmap,
                 overlay = state.overlay,
@@ -68,7 +76,7 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(tr("范围", "Range"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("范围", "Range"), style = MaterialTheme.typography.labelMedium, color = Soft)
             Spacer(Modifier.width(8.dp))
             sizeLabels(state.optionCount).forEachIndexed { index, label ->
                 Box(Modifier.padding(horizontal = 3.dp)) {
@@ -89,23 +97,25 @@ fun ColumnScope.CutoutEditor(state: CutoutState) {
 
 @Composable
 private fun ToolChip(icon: ImageVector, label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    // Flat card-stock chip; the active tool is pine with a short rust underline.
     val fg = when {
-        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        selected -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.primary
+        !enabled -> Soft.copy(alpha = 0.4f)
+        selected -> Pine
+        else -> Soft
     }
     Row(
         Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (enabled) bg else bg.copy(alpha = 0.5f))
+            .clip(RoundedCornerShape(2.dp))
+            .background(Card)
+            .border(1.dp, if (selected) Pine.copy(alpha = 0.35f) else Divider, RoundedCornerShape(2.dp))
             .clickable(enabled = enabled, onClick = onClick)
+            .activeUnderline(selected)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text(label, color = fg, style = MaterialTheme.typography.titleMedium)
+        Text(label, color = fg, style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp))
     }
 }
 

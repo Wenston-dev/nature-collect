@@ -39,15 +39,12 @@ import io.github.wgd753.naturecollect.ui.categories.CategoriesScreen
 import io.github.wgd753.naturecollect.ui.achievements.AchievementsScreen
 import io.github.wgd753.naturecollect.ui.onboarding.Onboarding
 import androidx.compose.runtime.collectAsState
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.ForestDeep
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.Sun
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.WashSap
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.lerp
+import io.github.wgd753.naturecollect.ui.theme.Card
+import io.github.wgd753.naturecollect.ui.theme.Celadon
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import androidx.compose.foundation.border
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
@@ -123,7 +120,7 @@ fun NatureCollectApp() {
     if (!onboarded && apiKey == null) Onboarding(onDone = container.settings::setOnboarded)
 
     Scaffold(
-        modifier = Modifier.background(Paper).paperGrain(),
+        modifier = Modifier.background(Celadon).paperGrain(),
         containerColor = Color.Transparent,
         bottomBar = {
             AnimatedVisibility(
@@ -186,50 +183,54 @@ fun NatureCollectApp() {
 }
 
 /**
- * A paper tab bar that fades up into the page: line icons either side and a
- * raised ochre watercolour blot in the middle that opens the camera.
+ * Flat white card-stock tab bar under a top hairline: line icons with small
+ * labels, the active tab in pine with a short rust underline, and a raised
+ * white shutter with a rust ring in the middle that opens the camera.
  */
 @Composable
 private fun FloatingNavBar(current: Tab?, onSelect: (Tab) -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .background(Brush.verticalGradient(0f to Paper.copy(alpha = 0f), 0.45f to Paper, 1f to Paper))
-            .navigationBarsPadding()
-            .padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 4.dp),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Row(
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        // The transparent top padding keeps the raised shutter inside the
+        // bar's bounds so all of it stays tappable.
+        Column(
             Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(top = 28.dp)
+                .background(Card)
+                .navigationBarsPadding(),
         ) {
-            NavItem(Tab.Collection, current, onSelect)
-            NavItem(Tab.Globe, current, onSelect)
-            Spacer(Modifier.width(84.dp))
-            NavItem(Tab.Calendar, current, onSelect)
-            NavItem(Tab.Board, current, onSelect)
+            Hairline(color = Pine.copy(alpha = 0.18f))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NavItem(Tab.Collection, current, onSelect)
+                NavItem(Tab.Globe, current, onSelect)
+                Spacer(Modifier.width(76.dp))
+                NavItem(Tab.Calendar, current, onSelect)
+                NavItem(Tab.Board, current, onSelect)
+            }
         }
         val cameraSelected = current == Tab.Camera
-        val lift by animateDpAsState(if (cameraSelected) (-18).dp else (-10).dp, spring(dampingRatio = 0.5f), label = "shutterLift")
+        val lift by animateDpAsState(if (cameraSelected) (-26).dp else (-20).dp, spring(dampingRatio = 0.7f), label = "shutterLift")
         Box(
             Modifier
+                .navigationBarsPadding()
                 .offset(y = lift)
-                .size(78.dp)
+                .size(60.dp)
+                .shadow(2.dp, CircleShape, ambientColor = Pine.copy(alpha = 0.2f), spotColor = Pine.copy(alpha = 0.2f))
+                .background(Card, CircleShape)
+                .border(0.8.dp, Rust.copy(alpha = 0.35f), CircleShape)
+                .padding(4.dp)
+                .border(2.dp, Rust, CircleShape)
                 .clip(CircleShape)
                 .clickable { onSelect(Tab.Camera) },
             contentAlignment = Alignment.Center,
         ) {
-            // A soft paper-ochre core casts the shadow; the blot gives it a painted edge.
-            Box(
-                Modifier
-                    .size(54.dp)
-                    .shadow(10.dp, CircleShape, ambientColor = ForestDeep.copy(alpha = 0.35f), spotColor = ForestDeep.copy(alpha = 0.35f))
-                    .background(lerp(Paper, Sun, 0.55f), CircleShape),
-            )
-            WatercolorWash(Sun, seed = 7, modifier = Modifier.size(78.dp), strength = 2.2f)
-            Icon(Icons.Outlined.PhotoCamera, contentDescription = Tab.Camera.label, tint = Forest, modifier = Modifier.size(28.dp))
+            Icon(Icons.Outlined.PhotoCamera, contentDescription = Tab.Camera.label, tint = Rust, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -237,24 +238,25 @@ private fun FloatingNavBar(current: Tab?, onSelect: (Tab) -> Unit) {
 @Composable
 private fun RowScope.NavItem(tab: Tab, current: Tab?, onSelect: (Tab) -> Unit) {
     val selected = tab == current
-    val tint by animateColorAsState(if (selected) Forest else TextMuted, label = "navTint")
+    val tint by animateColorAsState(if (selected) Pine else Soft, label = "navTint")
     Column(
         Modifier
             .weight(1f)
             .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(2.dp))
             .clickable { onSelect(tab) }
-            .padding(vertical = 4.dp),
+            .padding(top = 6.dp, bottom = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(width = 40.dp, height = 28.dp), contentAlignment = Alignment.Center) {
-            if (selected) WatercolorWash(WashSap, seed = tab.ordinal + 3, modifier = Modifier.fillMaxSize(), strength = 1.6f)
-            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(21.dp))
-        }
+        Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(21.dp))
         Text(
             tab.label,
+            modifier = Modifier
+                .padding(top = 3.dp)
+                .activeUnderline(selected)
+                .padding(bottom = 6.dp),
             color = tint,
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp, fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal),
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal),
             maxLines = 1,
             softWrap = false,
         )

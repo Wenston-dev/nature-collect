@@ -31,6 +31,9 @@ import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.rememberContainer
+import io.github.wgd753.naturecollect.ui.theme.Celadon
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
 import kotlinx.coroutines.launch
 import io.github.wgd753.naturecollect.ui.tr
 
@@ -58,7 +61,7 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
         Column(
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Celadon)
                 .systemBarsPadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -69,7 +72,7 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
             }
             if (state == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    if (error != null) Text(tr("抠图失败：$error", "Cutout failed: $error"), color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
+                    if (error != null) Text(tr("抠图失败：$error", "Cutout failed: $error"), color = Rust) else CircularProgressIndicator(color = Pine, strokeWidth = 2.dp)
                 }
             } else {
                 CutoutEditor(state)

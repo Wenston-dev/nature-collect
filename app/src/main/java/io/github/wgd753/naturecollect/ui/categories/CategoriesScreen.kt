@@ -9,7 +9,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
@@ -66,13 +65,12 @@ import androidx.compose.ui.unit.sp
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.ui.rememberContainer
 import io.github.wgd753.naturecollect.ui.ColorSwatchButton
-import io.github.wgd753.naturecollect.ui.WatercolorWash
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.Paper
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.specimenCard
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
+import io.github.wgd753.naturecollect.ui.tint
 import io.github.wgd753.naturecollect.ui.tr
-import io.github.wgd753.naturecollect.ui.washFor
 
 private val Palette = listOf(
     0xFF3D7DCA, 0xFF2BA3A8, 0xFF3E9B57, 0xFF8DB33A, 0xFFE5B21F,
@@ -99,10 +97,10 @@ fun CategoriesScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Forest)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = tr("返回", "Back"), tint = Pine)
             }
-            Text(tr("分类管理", "Categories"), style = MaterialTheme.typography.titleLarge, color = Forest, modifier = Modifier.weight(1f))
-            TextButton(onClick = { confirmReset = true }) { Text(tr("恢复默认", "Reset"), color = TextMuted) }
+            Text(spaced(tr("分类管理", "Categories")), style = MaterialTheme.typography.titleLarge, color = Pine, modifier = Modifier.weight(1f))
+            TextButton(onClick = { confirmReset = true }) { Text(tr("恢复默认", "Reset"), color = Soft) }
         }
         // Long-press a row and drag to reorder; the new order is saved on release.
         var order by remember(categories) { mutableStateOf(categories) }
@@ -114,15 +112,15 @@ fun CategoriesScreen(onBack: () -> Unit) {
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             order.forEach { category ->
                 key(category.key) {
                     val dragging = draggingKey == category.key
                     var rowHeight by remember { mutableIntStateOf(0) }
-                    // Only a lifted row gets paper and a faint shadow, so it reads above the others while dragging.
-                    val lift by animateDpAsState(if (dragging) 4.dp else 0.dp, label = "lift")
+                    // A lifted row casts a deeper shadow, so it reads above the others while dragging.
+                    val lift by animateDpAsState(if (dragging) 5.dp else 1.dp, label = "lift")
                     Row(
                         Modifier
                             .zIndex(if (dragging) 1f else 0f)
@@ -133,7 +131,6 @@ fun CategoriesScreen(onBack: () -> Unit) {
                                 scaleX = sc
                                 scaleY = sc
                             }
-                            .shadow(lift, RoundedCornerShape(20.dp))
                             .pointerInput(category.key) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
@@ -167,30 +164,32 @@ fun CategoriesScreen(onBack: () -> Unit) {
                                 )
                             }
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (dragging) Paper else Color.Transparent)
+                            .specimenCard(lift)
                             .clickable { editing = category }
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                            .padding(start = 6.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                            WatercolorWash(washFor(category), seed = category.key.hashCode(), modifier = Modifier.fillMaxSize())
+                        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                             Text(category.emoji, fontSize = 20.sp)
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(category.display, fontFamily = TitleFont, fontSize = 16.sp, letterSpacing = 1.sp, color = Forest)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(category.tint))
+                                Spacer(Modifier.width(7.dp))
+                                Text(category.display, style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp), color = Pine)
+                            }
                             Text(
                                 category.hint ?: tr("没有说明", "No hint"),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = TextMuted,
+                                color = Soft,
                                 maxLines = 1,
                             )
                         }
                         Icon(
                             Icons.Outlined.DragHandle,
                             contentDescription = null,
-                            tint = TextMuted.copy(alpha = 0.6f),
+                            tint = Soft.copy(alpha = 0.6f),
                         )
                     }
                 }
@@ -199,16 +198,15 @@ fun CategoriesScreen(onBack: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(1.dp, Forest.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                        .border(1.dp, Pine.copy(alpha = 0.35f))
                         .clickable { adding = true }
                         .padding(14.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.Add, contentDescription = null, tint = Forest, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Outlined.Add, contentDescription = null, tint = Pine, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(tr("添加分类", "Add category"), color = Forest)
+                    Text(tr("添加分类", "Add category"), color = Pine, style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 1.sp))
                 }
             }
         }
@@ -316,11 +314,12 @@ private fun CategoryDialog(
                     Box(
                         Modifier
                             .size(56.dp)
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(color).copy(alpha = 0.16f))
+                            .border(1.dp, Color(color).copy(alpha = 0.5f), RoundedCornerShape(2.dp))
                             .clickable { emojiFocus.requestFocus() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        WatercolorWash(washFor(Color(color)), seed = initial.key.hashCode(), modifier = Modifier.fillMaxSize())
                         Text(emoji.ifEmpty { "?" }, fontSize = 26.sp)
                     }
                     Spacer(Modifier.width(10.dp))
@@ -341,7 +340,7 @@ private fun CategoryDialog(
                             e,
                             fontSize = 20.sp,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(2.dp))
                                 .background(if (e == emoji) Color(color).copy(alpha = 0.2f) else Color.Transparent)
                                 .clickable { emoji = e }
                                 .padding(4.dp),

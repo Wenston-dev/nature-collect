@@ -14,8 +14,8 @@ object LayerArt {
     fun showMillis(count: Int): Long = 260L * count + 520L
 
     /**
-     * A SAM candidate mask as an overlay: a bright 2px contour over a faint fill,
-     * white so the screen can tint it.
+     * A SAM candidate mask as an overlay: a crisp 2px contour over a very faint fill,
+     * white so the screen can tint it (white for candidates, rust for the pick).
      */
     fun outline(alpha: FloatArray, w: Int, h: Int): Bitmap {
         val scale = SIDE.toFloat() / max(w, h)
@@ -37,7 +37,7 @@ object LayerArt {
                     val ny = y + dy
                     if (nx !in 0 until sw || ny !in 0 until sh || !inside[ny * sw + nx]) { edge = true; break@loop }
                 }
-                pixels[i] = if (edge) Color.WHITE else Color.argb(70, 255, 255, 255)
+                pixels[i] = if (edge) Color.WHITE else Color.argb(40, 255, 255, 255)
             }
         }
         return Bitmap.createBitmap(pixels, sw, sh, Bitmap.Config.ARGB_8888)

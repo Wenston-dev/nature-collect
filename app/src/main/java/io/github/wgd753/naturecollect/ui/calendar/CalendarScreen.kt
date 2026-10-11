@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -24,8 +23,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
@@ -44,8 +41,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -58,15 +53,15 @@ import io.github.wgd753.naturecollect.ui.CategoryFilterRow
 import io.github.wgd753.naturecollect.ui.PageHeader
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.rememberContainer
-import io.github.wgd753.naturecollect.ui.WatercolorWash
+import io.github.wgd753.naturecollect.ui.activeUnderline
+import io.github.wgd753.naturecollect.ui.specimenCard
 import io.github.wgd753.naturecollect.ui.tr
-import io.github.wgd753.naturecollect.ui.washFor
-import io.github.wgd753.naturecollect.ui.theme.Forest
-import io.github.wgd753.naturecollect.ui.theme.InkSoft
-import io.github.wgd753.naturecollect.ui.theme.LatinStyle
-import io.github.wgd753.naturecollect.ui.theme.Sun
-import io.github.wgd753.naturecollect.ui.theme.TextMuted
-import io.github.wgd753.naturecollect.ui.theme.TitleFont
+import io.github.wgd753.naturecollect.ui.theme.MonoFont
+import io.github.wgd753.naturecollect.ui.theme.MonoStyle
+import io.github.wgd753.naturecollect.ui.theme.Pine
+import io.github.wgd753.naturecollect.ui.theme.Rust
+import io.github.wgd753.naturecollect.ui.theme.Soft
+import io.github.wgd753.naturecollect.ui.theme.spaced
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -101,11 +96,11 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        PageHeader(tr("日历", "Calendar")) {
+        PageHeader(spaced(tr("日历", "Calendar"))) {
             TextButton(onClick = {
                 monthOffset = 0
                 selectedEpochDay = today.toEpochDay()
-            }) { Text(tr("今天", "Today"), color = Forest) }
+            }) { Text(tr("今天", "Today"), color = Pine) }
         }
         DayCard(selected, byDay[selected].orEmpty(), onOpenCapture)
         CategoryFilterRow(selected = filter, onSelect = { filter = it }, modifier = Modifier.padding(top = 12.dp))
@@ -115,18 +110,18 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = { monthOffset-- }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = tr("上个月", "Previous month"), tint = Forest)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = tr("上个月", "Previous month"), tint = Pine)
             }
             Text(
                 text = tr(
                     "${month.year} 年 ${month.monthValue} 月",
                     "${month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${month.year}",
                 ),
-                style = MaterialTheme.typography.titleLarge,
-                color = Forest,
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFont, letterSpacing = 1.sp),
+                color = Pine,
             )
             IconButton(onClick = { monthOffset++ }) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = tr("下个月", "Next month"), tint = Forest)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = tr("下个月", "Next month"), tint = Pine)
             }
         }
         AnimatedContent(
@@ -145,7 +140,9 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
                 byDay = byDay,
                 onSelect = { selectedEpochDay = it.toEpochDay() },
                 modifier = Modifier
-                    .padding(horizontal = 12.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
+                    .specimenCard()
+                    .padding(horizontal = 6.dp)
                     .pointerInput(Unit) {
                         var total = 0f
                         detectHorizontalDragGestures(
@@ -161,21 +158,22 @@ fun CalendarScreen(onOpenCapture: (String) -> Unit) {
     }
 }
 
-/** The big "today" page: the date in title numerals with the day's stickers scattered around on washes. */
+/** The day sheet: the date in mono figures with the day's stickers placed around it. */
 @Composable
 private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture: (String) -> Unit) {
-    val ink = Forest
+    val ink = Pine
     BoxWithConstraints(
         Modifier
             .padding(horizontal = 16.dp)
             .fillMaxWidth()
-            .height(210.dp),
+            .height(210.dp)
+            .specimenCard(),
     ) {
         val spots = listOf(
-            Triple(0.02f, 0.04f, -8f),
-            Triple(0.70f, 0.02f, 7f),
-            Triple(0.02f, 0.52f, 6f),
-            Triple(0.72f, 0.50f, -6f),
+            Triple(0.02f, 0.04f, -6f),
+            Triple(0.70f, 0.02f, 5f),
+            Triple(0.02f, 0.52f, 4f),
+            Triple(0.72f, 0.50f, -4f),
         )
         captures.take(spots.size).forEachIndexed { i, capture ->
             val (fx, fy, rot) = spots[i]
@@ -186,49 +184,41 @@ private fun DayCard(day: LocalDate, captures: List<CaptureEntity>, onOpenCapture
                     .graphicsLayer { rotationZ = rot }
                     .clickable { onOpenCapture(capture.id) },
             ) {
-                WatercolorWash(
-                    washFor(Category.fromKey(capture.category)),
-                    seed = capture.id.hashCode(),
-                    modifier = Modifier.fillMaxSize(),
-                    strength = 0.8f,
-                )
-                StickerImage(capture, Modifier.fillMaxSize().padding(10.dp))
+                StickerImage(capture, Modifier.fillMaxSize().padding(8.dp))
             }
         }
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("${day.year}", color = ink, fontFamily = TitleFont, fontSize = 18.sp, letterSpacing = 1.sp)
+            Text("${day.year}", color = ink, style = MonoStyle.copy(fontSize = 15.sp, letterSpacing = 2.sp))
             Text(
                 day.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH).uppercase(),
                 color = ink,
-                style = LatinStyle,
-                fontSize = 13.sp,
+                style = MonoStyle,
+                fontSize = 12.sp,
             )
             Text(
                 "${day.dayOfYear}/${day.lengthOfYear()} ${day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()}",
-                color = TextMuted,
-                style = LatinStyle,
+                color = Soft,
+                style = MonoStyle,
                 fontSize = 10.sp,
             )
-            Text("${day.dayOfMonth}", color = ink, fontFamily = TitleFont, fontSize = 72.sp, lineHeight = 76.sp)
+            Text("${day.dayOfMonth}", color = ink, fontFamily = MonoFont, fontWeight = FontWeight.Medium, fontSize = 64.sp, lineHeight = 70.sp)
         }
         if (captures.isNotEmpty()) {
             Text(
-                "${captures.size}",
+                "×${captures.size}",
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp)
-                    .offset(x = 70.dp)
-                    .border(1.dp, ink.copy(alpha = 0.6f), CircleShape)
-                    .padding(horizontal = 9.dp, vertical = 2.dp),
-                color = ink,
-                fontFamily = TitleFont,
+                    .offset(x = 64.dp),
+                color = Soft,
+                style = MonoStyle.copy(fontSize = 12.sp),
             )
         } else {
             Text(
                 tr("这天还没有收集", "Nothing collected this day"),
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = TextMuted,
+                color = Soft,
             )
         }
     }
@@ -247,7 +237,7 @@ private fun MonthGrid(
     val leadingBlanks = month.atDay(1).dayOfWeek.value % 7
     val cells: List<Int?> = List(leadingBlanks) { null } + (1..month.lengthOfMonth()).toList()
 
-    Column(modifier.padding(bottom = 16.dp)) {
+    Column(modifier.padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             WeekdayLabels.forEach { label ->
                 Text(
@@ -255,7 +245,7 @@ private fun MonthGrid(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelMedium,
-                    color = InkSoft,
+                    color = Soft,
                 )
             }
         }
@@ -289,36 +279,34 @@ private fun DayCell(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val ink = Forest
-    val seed = date.toEpochDay().toInt()
+    val ink = Pine
     Box(
         Modifier
             .fillMaxSize()
             .padding(2.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .then(if (isSelected) Modifier.border(1.dp, ink.copy(alpha = 0.55f), RoundedCornerShape(14.dp)) else Modifier)
+            .then(if (isSelected) Modifier.border(1.dp, ink.copy(alpha = 0.6f)) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (captures.isEmpty()) {
-            Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                if (isToday) WatercolorWash(Sun, seed = seed, modifier = Modifier.fillMaxSize())
-                Text(
-                    "${date.dayOfMonth}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = ink,
-                )
-            }
+            // Today is the page's one rust mark.
+            Text(
+                "${date.dayOfMonth}",
+                modifier = Modifier.activeUnderline(isToday, width = 12.dp).padding(horizontal = 4.dp, vertical = 3.dp),
+                style = MonoStyle.copy(fontSize = 13.sp, letterSpacing = 0.sp),
+                color = if (isToday) Rust else ink,
+            )
         } else {
             val first = captures.first()
-            WatercolorWash(
-                if (isToday) Sun else washFor(Category.fromKey(first.category)),
-                seed = seed,
-                modifier = Modifier.fillMaxSize(),
-                strength = 0.8f,
+            StickerImage(first, Modifier.fillMaxSize().padding(start = 4.dp, end = 4.dp, top = 9.dp, bottom = 3.dp))
+            Text(
+                "${date.dayOfMonth}",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 3.dp),
+                style = MonoStyle.copy(fontSize = 9.sp, letterSpacing = 0.sp),
+                color = if (isToday) Rust else Soft,
             )
-            StickerImage(first, Modifier.fillMaxSize().padding(5.dp))
             if (captures.size > 1) {
                 Text(
                     "${captures.size}",
@@ -326,8 +314,7 @@ private fun DayCell(
                         .align(Alignment.TopEnd)
                         .padding(end = 3.dp),
                     color = ink,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = MonoStyle.copy(fontSize = 9.sp, letterSpacing = 0.sp, fontWeight = FontWeight.Medium),
                 )
             }
         }
