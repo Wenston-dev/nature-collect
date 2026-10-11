@@ -17,11 +17,14 @@ import kotlin.math.roundToInt
 /** A tap on the image, in the coordinates of [SamImage.bitmap]. */
 data class PromptPoint(val x: Float, val y: Float, val positive: Boolean = true)
 
-/** What the user pointed at: taps, or a loop drawn around the subject. */
+/** What the user pointed at: nothing yet, taps, or a loop drawn around the subject. */
 sealed interface SamPrompt {
+    /** No input: find the photo's main subject. */
+    data object Auto : SamPrompt
+
     data class Points(val points: List<PromptPoint>) : SamPrompt
 
-    /** A freehand loop, in bitmap coordinates. Its bounding box becomes SAM's box prompt. */
+    /** A freehand loop, in bitmap coordinates; the subject is looked for inside it. */
     data class Lasso(val path: List<PromptPoint>) : SamPrompt
 }
 
@@ -33,27 +36,41 @@ class SamImage internal constructor(
     /** The image scaled so its longest side is [SamSegmenter.INPUT_SIZE]. */
     val bitmap: Bitmap,
     internal val embedding: FloatArray,
+    /** The decoder's two high-resolution feature maps, [1, 32, 256, 256] and [1, 64, 128, 128]. */
+    internal val highRes0: FloatArray,
+    internal val highRes1: FloatArray,
+    /** How much each pixel of [bitmap] stands out as a subject, 0..1. */
+    internal val saliency: FloatArray,
 )
 
 /**
- * MobileSAM on ONNX Runtime. The image encoder runs once per photo (the slow
- * part); each tap then only runs the small prompt decoder.
+ * EdgeTAM (an on-device SAM 2) on ONNX Runtime. The image encoder runs once per
+ * photo (the slow part); each tap then only runs the small prompt decoder.
  *
- * The models are exported by tools/export_mobilesam_onnx.py: the encoder takes
- * a normalised, zero-padded [1, 3, 1024, 1024] tensor and returns
- * [1, 256, 64, 64] embeddings; the decoder is SAM's standard ONNX decoder
- * returning all four candidate masks with their predicted scores.
+ * The models are exported by tools/export_edgetam_onnx.py: the encoder takes
+ * the photo stretched to a normalised [1, 3, 1024, 1024] tensor and returns
+ * [1, 256, 64, 64] embeddings plus two high-resolution feature maps; the
+ * decoder takes SAM's usual prompts in image pixels and returns all four
+ * candidate masks with their predicted scores.
+ *
+ * SAM-style models only segment what they are pointed at, and a lone tap or a
+ * loose box often lands on a petal or the background. So each photo also goes
+ * through U²-Netp, a small salient-object detector: its map says where the
+ * subject is, becomes a tight box plus an inner point for EdgeTAM, and decides
+ * which of EdgeTAM's candidate masks to show.
  */
 class SamSegmenter(private val context: Context) {
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
     private val mutex = Mutex()
     private var encoder: OrtSession? = null
     private var decoder: OrtSession? = null
+    private var salient: OrtSession? = null
 
-    private suspend fun sessions(): Pair<OrtSession, OrtSession> = mutex.withLock {
+    private suspend fun sessions(): Triple<OrtSession, OrtSession, OrtSession> = mutex.withLock {
         val enc = encoder ?: createSession(ENCODER_ASSET).also { encoder = it }
         val dec = decoder ?: createSession(DECODER_ASSET).also { decoder = it }
-        enc to dec
+        val sal = salient ?: createSession(SALIENCY_ASSET).also { salient = it }
+        Triple(enc, dec, sal)
     }
 
     /** Loads the models in the background so the first photo is faster. */
@@ -76,40 +93,76 @@ class SamSegmenter(private val context: Context) {
         return env.createSession(file.path, options)
     }
 
-    /** Runs the image encoder. Takes about a second or two on a recent phone. */
+    /** Runs the image encoder. Takes well under a second on a recent phone. */
     suspend fun encode(source: Bitmap): SamImage = withContext(Dispatchers.Default) {
-        val (enc, _) = sessions()
+        val (enc, _, sal) = sessions()
         val scale = INPUT_SIZE.toFloat() / max(source.width, source.height)
         val w = (source.width * scale).roundToInt().coerceIn(1, INPUT_SIZE)
         val h = (source.height * scale).roundToInt().coerceIn(1, INPUT_SIZE)
         val scaled = Bitmap.createScaledBitmap(source, w, h, true).copy(Bitmap.Config.ARGB_8888, false)
 
-        val pixels = IntArray(w * h)
-        scaled.getPixels(pixels, 0, w, 0, 0, w, h)
+        // SAM 2 stretches the image to a square rather than padding it.
+        val square = Bitmap.createScaledBitmap(source, INPUT_SIZE, INPUT_SIZE, true).copy(Bitmap.Config.ARGB_8888, false)
         val plane = INPUT_SIZE * INPUT_SIZE
-        // Padding stays 0, matching SAM's normalise-then-pad preprocessing.
+        val pixels = IntArray(plane)
+        square.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+        square.recycle()
         val input = FloatArray(3 * plane)
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val p = pixels[y * w + x]
-                val i = y * INPUT_SIZE + x
-                input[i] = (((p shr 16) and 0xFF) - MEAN[0]) / STD[0]
-                input[plane + i] = (((p shr 8) and 0xFF) - MEAN[1]) / STD[1]
-                input[2 * plane + i] = ((p and 0xFF) - MEAN[2]) / STD[2]
-            }
+        for (i in 0 until plane) {
+            val p = pixels[i]
+            input[i] = (((p shr 16) and 0xFF) - MEAN[0]) / STD[0]
+            input[plane + i] = (((p shr 8) and 0xFF) - MEAN[1]) / STD[1]
+            input[2 * plane + i] = ((p and 0xFF) - MEAN[2]) / STD[2]
         }
-        val embedding = OnnxTensor.createTensor(
+        OnnxTensor.createTensor(
             env,
             FloatBuffer.wrap(input),
             longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong()),
         ).use { tensor ->
             enc.run(mapOf(ENCODER_INPUT to tensor)).use { result ->
-                val out = result[0] as OnnxTensor
-                val buffer = out.floatBuffer
-                FloatArray(buffer.remaining()).also { buffer.get(it) }
+                fun output(name: String): FloatArray {
+                    val buffer = (result[name].get() as OnnxTensor).floatBuffer
+                    return FloatArray(buffer.remaining()).also { buffer.get(it) }
+                }
+                SamImage(
+                    scaled,
+                    output("image_embeddings"),
+                    output("high_res_feats_0"),
+                    output("high_res_feats_1"),
+                    saliency(sal, scaled),
+                )
             }
         }
-        SamImage(scaled, embedding)
+    }
+
+    /** U²-Netp's saliency map for [image], min-max normalised and resized to the image. */
+    private fun saliency(session: OrtSession, image: Bitmap): FloatArray {
+        val size = SALIENCY_SIZE
+        val small = Bitmap.createScaledBitmap(image, size, size, true)
+        val plane = size * size
+        val pixels = IntArray(plane)
+        small.getPixels(pixels, 0, size, 0, 0, size, size)
+        if (small !== image) small.recycle()
+        // As in U²-Net's own preprocessing: scale by the brightest channel value, then ImageNet mean/std.
+        var peak = 1
+        for (p in pixels) peak = maxOf(peak, (p shr 16) and 0xFF, (p shr 8) and 0xFF, p and 0xFF)
+        val input = FloatArray(3 * plane)
+        for (i in 0 until plane) {
+            val p = pixels[i]
+            input[i] = (((p shr 16) and 0xFF).toFloat() / peak - 0.485f) / 0.229f
+            input[plane + i] = (((p shr 8) and 0xFF).toFloat() / peak - 0.456f) / 0.224f
+            input[2 * plane + i] = ((p and 0xFF).toFloat() / peak - 0.406f) / 0.225f
+        }
+        val map = OnnxTensor.createTensor(env, FloatBuffer.wrap(input), longArrayOf(1, 3, size.toLong(), size.toLong())).use { tensor ->
+            session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
+                val buffer = (result[0] as OnnxTensor).floatBuffer
+                FloatArray(plane).also { buffer.get(it) }
+            }
+        }
+        val lo = map.min()
+        val range = (map.max() - lo).coerceAtLeast(1e-6f)
+        for (i in map.indices) map[i] = (map[i] - lo) / range
+        return MaskOps.resize(map, size, size, image.width, image.height)
     }
 
     /** Shorthand for a tap prompt. */
@@ -123,10 +176,17 @@ class SamSegmenter(private val context: Context) {
     }
 
     /**
-     * Runs the decoder and returns SAM's candidate masks, smallest to largest,
-     * so the user can widen or narrow the selection. The default leans towards
-     * the larger candidates, because SAM's single "best" mask often grabs just
-     * one part of an object (the cap of a bottle, one petal).
+     * Runs the decoder and returns its candidate masks, smallest to largest,
+     * so the user can widen or narrow the selection.
+     *
+     * With no prompt or a lasso, the salient subject (in the whole photo, or
+     * inside the loop) is handed to EdgeTAM as a tight box plus an inner point,
+     * and the candidate that best matches it is the default. A loose box on its
+     * own makes SAM-style models pick the background, so the loop's outline is
+     * only used to clip the result. A tap that lands on a salient region picks
+     * the candidate matching that region; otherwise the default leans towards the
+     * larger candidates, because the model's "best" mask often grabs just one
+     * part of an object (the cap of a bottle, one petal).
      *
      * [erase] strokes remove things: their points go to SAM as negative
      * prompts, and the pixels under each stroke are cleared like an eraser.
@@ -136,14 +196,52 @@ class SamSegmenter(private val context: Context) {
         prompt: SamPrompt,
         erase: List<List<PromptPoint>> = emptyList(),
     ): SegmentResult = withContext(Dispatchers.Default) {
-        val (_, dec) = sessions()
+        val (_, dec, _) = sessions()
         val w = image.bitmap.width
         val h = image.bitmap.height
         val negatives = erase.flatMap { sample(it, 6) }.map { it.copy(positive = false) }
+        val lasso = (prompt as? SamPrompt.Lasso)?.let { lassoMask(it.path, w, h) }
+        // The salient region that should be cut out, if the saliency map has one.
+        val guide = when (prompt) {
+            SamPrompt.Auto -> MaskOps.salientSubject(image.saliency, w, h)
+            is SamPrompt.Lasso -> MaskOps.salientSubject(image.saliency, w, h, roi = lasso, centerWeight = false)
+            is SamPrompt.Points -> prompt.points.singleOrNull()?.let { MaskOps.salientAt(image.saliency, w, h, it) }
+        }
         val coordList = ArrayList<Float>()
         val labelList = ArrayList<Float>()
         val singleTap: Boolean
-        when (prompt) {
+        var seeds: List<PromptPoint> = emptyList()
+        if (guide != null && prompt !is SamPrompt.Points) {
+            // Box corners use labels 2 (top-left) and 3 (bottom-right), then a positive point deep inside.
+            val box = MaskOps.bounds(FloatArray(w * h) { if (guide[it]) 1f else 0f }, w, h)!!
+            val inner = MaskOps.interiorPoint(guide, w, h)
+            coordList += listOf(box[0].toFloat(), box[1].toFloat(), box[2] - 1f, box[3] - 1f, inner.x, inner.y)
+            labelList += listOf(2f, 3f, 1f)
+            negatives.forEach { p ->
+                coordList += p.x
+                coordList += p.y
+                labelList += 0f
+            }
+            coordList += 0f
+            coordList += 0f
+            labelList += -1f
+            singleTap = false
+            seeds = listOf(inner)
+        } else when (prompt) {
+            SamPrompt.Auto -> {
+                // Nothing stands out: fall back to whatever is in the middle of the frame.
+                val center = PromptPoint(w / 2f, h / 2f)
+                listOf(center).plus(negatives).forEach { p ->
+                    coordList += p.x
+                    coordList += p.y
+                    labelList += if (p.positive) 1f else 0f
+                }
+                coordList += 0f
+                coordList += 0f
+                labelList += -1f
+                singleTap = negatives.isEmpty()
+                seeds = listOf(center)
+            }
             is SamPrompt.Points -> {
                 (prompt.points + negatives).forEach { p ->
                     coordList += p.x
@@ -155,9 +253,10 @@ class SamSegmenter(private val context: Context) {
                 coordList += 0f
                 labelList += -1f
                 singleTap = prompt.points.size == 1 && negatives.isEmpty()
+                seeds = prompt.points.filter { it.positive }
             }
             is SamPrompt.Lasso -> {
-                // Box corners use labels 2 (top-left) and 3 (bottom-right); no padding point.
+                // Box corners use labels 2 (top-left) and 3 (bottom-right).
                 val xs = prompt.path.map { it.x.coerceIn(0f, w - 1f) }
                 val ys = prompt.path.map { it.y.coerceIn(0f, h - 1f) }
                 coordList += listOf(xs.min(), ys.min(), xs.max(), ys.max())
@@ -167,6 +266,10 @@ class SamSegmenter(private val context: Context) {
                     coordList += p.y
                     labelList += 0f
                 }
+                // Unlike SAM, SAM 2 always ends the prompt with a padding point, boxes included.
+                coordList += 0f
+                coordList += 0f
+                labelList += -1f
                 singleTap = false
             }
         }
@@ -176,6 +279,8 @@ class SamSegmenter(private val context: Context) {
 
         val inputs = mapOf(
             "image_embeddings" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.embedding), longArrayOf(1, 256, 64, 64)),
+            "high_res_feats_0" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.highRes0), longArrayOf(1, 32, 256, 256)),
+            "high_res_feats_1" to OnnxTensor.createTensor(env, FloatBuffer.wrap(image.highRes1), longArrayOf(1, 64, 128, 128)),
             "point_coords" to OnnxTensor.createTensor(env, FloatBuffer.wrap(coords), longArrayOf(1, n.toLong(), 2)),
             "point_labels" to OnnxTensor.createTensor(env, FloatBuffer.wrap(labels), longArrayOf(1, n.toLong())),
             "mask_input" to OnnxTensor.createTensor(env, FloatBuffer.wrap(FloatArray(256 * 256)), longArrayOf(1, 1, 256, 256)),
@@ -183,8 +288,6 @@ class SamSegmenter(private val context: Context) {
             "orig_im_size" to OnnxTensor.createTensor(env, FloatBuffer.wrap(floatArrayOf(h.toFloat(), w.toFloat())), longArrayOf(2)),
         )
         val eraseMask = if (erase.isEmpty()) null else strokeMask(erase, w, h)
-        val lasso = (prompt as? SamPrompt.Lasso)?.let { lassoMask(it.path, w, h) }
-        val seeds = (prompt as? SamPrompt.Points)?.points?.filter { it.positive }.orEmpty()
         try {
             dec.run(inputs).use { result ->
                 val masks = (result[0] as OnnxTensor).floatBuffer
@@ -202,9 +305,12 @@ class SamSegmenter(private val context: Context) {
                     for (i in alpha.indices) {
                         if ((lasso != null && !lasso[i]) || (eraseMask != null && eraseMask[i])) alpha[i] = 0f
                     }
-                    Candidate(alpha, scores[index], alpha.count { it > 0.5f } / plane.toFloat())
+                    // EdgeTAM's own scores are poorly calibrated (whole objects often score
+                    // lowest), so with a guide the overlap with it decides instead.
+                    val score = if (guide != null) MaskOps.iou(alpha, guide) else scores[index]
+                    Candidate(alpha, score, alpha.count { it > 0.5f } / plane.toFloat())
                 }
-                pick(candidates, pointPrompt = prompt is SamPrompt.Points)
+                pick(candidates, pointPrompt = prompt !is SamPrompt.Lasso, guided = guide != null)
             }
         } finally {
             inputs.values.forEach { it.close() }
@@ -213,9 +319,10 @@ class SamSegmenter(private val context: Context) {
 
     private class Candidate(val alpha: FloatArray, val score: Float, val area: Float)
 
-    private fun pick(all: List<Candidate>, pointPrompt: Boolean): SegmentResult {
+    private fun pick(all: List<Candidate>, pointPrompt: Boolean, guided: Boolean): SegmentResult {
         val best = all.maxOfOrNull { it.score } ?: return SegmentResult(emptyList(), 0)
-        var usable = all.filter { it.area > 0.002f && it.score >= best - 0.15f }
+        // Unguided taps ignore the scores: EdgeTAM often scores the whole object lowest.
+        var usable = all.filter { it.area > 0.002f && (guided || pointPrompt || it.score >= best - 0.15f) }
         // A tap that "selects" almost the whole photo has picked the background.
         if (pointPrompt) usable = usable.filter { it.area < 0.85f }.ifEmpty { usable }
         if (usable.isEmpty()) usable = all.sortedByDescending { it.score }.take(1)
@@ -230,8 +337,12 @@ class SamSegmenter(private val context: Context) {
                 distinct += c
             }
         }
-        val preferred = distinct.indices.filter { distinct[it].score >= best - 0.06f && (!pointPrompt || distinct[it].area < 0.7f) }
-        val default = preferred.maxOrNull() ?: distinct.indices.maxBy { distinct[it].score }
+        val default = when {
+            guided -> distinct.indices.maxBy { distinct[it].score }
+            pointPrompt -> distinct.indices.filter { distinct[it].area < 0.7f }.maxOrNull() ?: 0
+            else -> distinct.indices.filter { distinct[it].score >= best - 0.06f }.maxOrNull()
+                ?: distinct.indices.maxBy { distinct[it].score }
+        }
         return SegmentResult(distinct.map { it.alpha }, default)
     }
 
@@ -295,8 +406,10 @@ class SamSegmenter(private val context: Context) {
 
         /** Eraser brush width as a fraction of the image's longer side. */
         const val ERASER_WIDTH = 0.045f
-        private const val ENCODER_ASSET = "sam/mobile_sam_encoder.onnx"
-        private const val DECODER_ASSET = "sam/mobile_sam_decoder.onnx"
+        private const val ENCODER_ASSET = "sam/edgetam_encoder.onnx"
+        private const val DECODER_ASSET = "sam/edgetam_decoder.onnx"
+        private const val SALIENCY_ASSET = "sam/u2netp.onnx"
+        private const val SALIENCY_SIZE = 320
         private const val ENCODER_INPUT = "image"
         private val MEAN = floatArrayOf(123.675f, 116.28f, 103.53f)
         private val STD = floatArrayOf(58.395f, 57.12f, 57.375f)

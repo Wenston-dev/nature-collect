@@ -125,7 +125,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.wgd753.naturecollect.data.Category
 import io.github.wgd753.naturecollect.data.db.RecognitionStatus
-import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ui.PillButton
 import io.github.wgd753.naturecollect.ui.StickerImage
 import io.github.wgd753.naturecollect.ui.cutout.CutoutEditor
@@ -742,7 +741,7 @@ private fun SelectSubject(stage: CameraStage.Selecting, vm: CameraViewModel) {
     val state = rememberCutoutState(
         stage.image,
         container.segmenter,
-        SamPrompt.Points(listOf(PromptPoint(stage.image.bitmap.width / 2f, stage.image.bitmap.height / 2f))),
+        SamPrompt.Auto,
     )
     Column(
         Modifier

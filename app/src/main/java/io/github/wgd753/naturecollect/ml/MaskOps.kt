@@ -159,4 +159,152 @@ object MaskOps {
         return if (right < 0) null else intArrayOf(left, top, right + 1, bottom + 1)
     }
 
+    /** Bilinear resize of a single-channel map. */
+    fun resize(src: FloatArray, sw: Int, sh: Int, dw: Int, dh: Int): FloatArray {
+        val out = FloatArray(dw * dh)
+        val fx = sw.toFloat() / dw
+        val fy = sh.toFloat() / dh
+        for (y in 0 until dh) {
+            val sy = ((y + 0.5f) * fy - 0.5f).coerceIn(0f, sh - 1f)
+            val y0 = sy.toInt()
+            val y1 = minOf(y0 + 1, sh - 1)
+            val ty = sy - y0
+            for (x in 0 until dw) {
+                val sx = ((x + 0.5f) * fx - 0.5f).coerceIn(0f, sw - 1f)
+                val x0 = sx.toInt()
+                val x1 = minOf(x0 + 1, sw - 1)
+                val tx = sx - x0
+                val top = src[y0 * sw + x0] * (1 - tx) + src[y0 * sw + x1] * tx
+                val bottom = src[y1 * sw + x0] * (1 - tx) + src[y1 * sw + x1] * tx
+                out[y * dw + x] = top * (1 - ty) + bottom * ty
+            }
+        }
+        return out
+    }
+
+    /** Labels 4-connected regions of [mask]; returns the label map (0 = outside) and the region count. */
+    fun label(mask: BooleanArray, w: Int, h: Int): Pair<IntArray, Int> {
+        val labels = IntArray(w * h)
+        val stack = IntArray(w * h)
+        var count = 0
+        for (start in 0 until w * h) {
+            if (!mask[start] || labels[start] != 0) continue
+            count++
+            var top = 0
+            stack[top++] = start
+            labels[start] = count
+            while (top > 0) {
+                val i = stack[--top]
+                val x = i % w
+                if (x > 0 && mask[i - 1] && labels[i - 1] == 0) { labels[i - 1] = count; stack[top++] = i - 1 }
+                if (x < w - 1 && mask[i + 1] && labels[i + 1] == 0) { labels[i + 1] = count; stack[top++] = i + 1 }
+                if (i >= w && mask[i - w] && labels[i - w] == 0) { labels[i - w] = count; stack[top++] = i - w }
+                if (i < w * (h - 1) && mask[i + w] && labels[i + w] == 0) { labels[i + w] = count; stack[top++] = i + w }
+            }
+        }
+        return labels to count
+    }
+
+    private fun salientMask(saliency: FloatArray, peak: Float) =
+        BooleanArray(saliency.size) { saliency[it] > maxOf(0.5f * peak, 0.25f) }
+
+    /**
+     * The photo's main subject according to a saliency map in 0..1: the strongest
+     * salient region, weighted towards the middle of the frame when [centerWeight]
+     * is set. Inside a lasso ([roi]) every sizeable salient region is kept, since
+     * the loop already says where to look. Null when nothing stands out.
+     */
+    fun salientSubject(saliency: FloatArray, w: Int, h: Int, roi: BooleanArray? = null, centerWeight: Boolean = true): BooleanArray? {
+        val s = if (roi == null) saliency else FloatArray(saliency.size) { if (roi[it]) saliency[it] else 0f }
+        val peak = s.max()
+        if (peak < 0.2f) return null
+        val (labels, count) = label(salientMask(s, peak), w, h)
+        if (count == 0) return null
+        val mass = DoubleArray(count + 1)
+        val size = IntArray(count + 1)
+        val sumX = DoubleArray(count + 1)
+        val sumY = DoubleArray(count + 1)
+        for (i in labels.indices) {
+            val l = labels[i]
+            if (l == 0) continue
+            mass[l] += s[i].toDouble()
+            size[l]++
+            sumX[l] += (i % w).toDouble()
+            sumY[l] += (i / w).toDouble()
+        }
+        var best = 0
+        var bestScore = -1.0
+        for (l in 1..count) {
+            if (size[l] < w * h / 1000) continue
+            var score = mass[l]
+            if (centerWeight) {
+                val cx = sumX[l] / size[l] / w - 0.5
+                val cy = sumY[l] / size[l] / h - 0.5
+                score *= kotlin.math.exp(-(cx * cx + cy * cy) / (2 * 0.3 * 0.3))
+            }
+            if (score > bestScore) {
+                bestScore = score
+                best = l
+            }
+        }
+        if (best == 0) return null
+        val keep = BooleanArray(w * h) { labels[it] == best }
+        if (roi != null) {
+            for (i in labels.indices) if (labels[i] != 0 && size[labels[i]] > size[best] / 5) keep[i] = true
+        }
+        return keep
+    }
+
+    /** The salient region under a tap, or null if the tap isn't on anything that stands out. */
+    fun salientAt(saliency: FloatArray, w: Int, h: Int, seed: PromptPoint): BooleanArray? {
+        val peak = saliency.max()
+        if (peak < 0.2f) return null
+        val mask = salientMask(saliency, peak)
+        val x = seed.x.toInt().coerceIn(0, w - 1)
+        val y = seed.y.toInt().coerceIn(0, h - 1)
+        if (!mask[y * w + x]) return null
+        return connectedTo(mask, w, h, listOf(seed))
+    }
+
+    /** The point deepest inside [mask] (largest distance to its edge), a safe place for a positive prompt. */
+    fun interiorPoint(mask: BooleanArray, w: Int, h: Int): PromptPoint {
+        // Two-pass chamfer distance transform.
+        val inf = Int.MAX_VALUE / 4
+        val d = IntArray(w * h) { if (mask[it]) inf else 0 }
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = y * w + x
+            if (d[i] == 0) continue
+            var v = d[i]
+            if (x > 0) v = minOf(v, d[i - 1] + 3) else v = minOf(v, 3)
+            if (y > 0) v = minOf(v, d[i - w] + 3) else v = minOf(v, 3)
+            if (x > 0 && y > 0) v = minOf(v, d[i - w - 1] + 4)
+            if (x < w - 1 && y > 0) v = minOf(v, d[i - w + 1] + 4)
+            d[i] = v
+        }
+        var best = 0
+        for (y in h - 1 downTo 0) for (x in w - 1 downTo 0) {
+            val i = y * w + x
+            if (d[i] == 0) continue
+            var v = d[i]
+            if (x < w - 1) v = minOf(v, d[i + 1] + 3) else v = minOf(v, 3)
+            if (y < h - 1) v = minOf(v, d[i + w] + 3) else v = minOf(v, 3)
+            if (x < w - 1 && y < h - 1) v = minOf(v, d[i + w + 1] + 4)
+            if (x > 0 && y < h - 1) v = minOf(v, d[i + w - 1] + 4)
+            d[i] = v
+            if (v > d[best]) best = i
+        }
+        return PromptPoint((best % w).toFloat(), (best / w).toFloat())
+    }
+
+    /** Intersection over union between a soft alpha (thresholded at 0.5) and a mask. */
+    fun iou(alpha: FloatArray, mask: BooleanArray): Float {
+        var inter = 0
+        var union = 0
+        for (i in alpha.indices) {
+            val a = alpha[i] > 0.5f
+            if (a && mask[i]) inter++
+            if (a || mask[i]) union++
+        }
+        return if (union == 0) 0f else inter.toFloat() / union
+    }
 }

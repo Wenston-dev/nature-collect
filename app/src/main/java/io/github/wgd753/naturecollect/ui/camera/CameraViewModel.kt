@@ -9,7 +9,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.wgd753.naturecollect.AppContainer
 import io.github.wgd753.naturecollect.data.db.CaptureEntity
-import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ml.SamImage
 import io.github.wgd753.naturecollect.ml.StickerMaker
 import kotlinx.coroutines.Job
@@ -67,9 +66,8 @@ class CameraViewModel(private val container: AppContainer) : ViewModel() {
             val location = if (exifLatLng == null && !imported) async { container.location.current() } else null
             try {
                 val image = container.segmenter.encode(bitmap)
-                // Default prompt: whatever is in the middle of the frame.
-                val center = PromptPoint(image.bitmap.width / 2f, image.bitmap.height / 2f)
-                val result = container.segmenter.segmentOptions(image, SamPrompt.Points(listOf(center)))
+                // Default prompt: the photo's main subject.
+                val result = container.segmenter.segmentOptions(image, SamPrompt.Auto)
                 val alpha = result.alphas.getOrNull(result.defaultIndex)
                     ?: FloatArray(image.bitmap.width * image.bitmap.height)
                 val (sticker, layers) = withContext(Dispatchers.Default) {

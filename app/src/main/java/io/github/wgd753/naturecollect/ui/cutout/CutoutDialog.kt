@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import io.github.wgd753.naturecollect.ml.PromptPoint
 import io.github.wgd753.naturecollect.ml.SamImage
 import io.github.wgd753.naturecollect.ml.SamPrompt
 import io.github.wgd753.naturecollect.ml.StickerMaker
@@ -68,7 +67,7 @@ fun CutoutDialog(photo: Bitmap, onDismiss: () -> Unit, onDone: (Bitmap) -> Unit)
         ) {
             val img = image
             val state = img?.let {
-                rememberCutoutState(it, container.segmenter, SamPrompt.Points(listOf(PromptPoint(it.bitmap.width / 2f, it.bitmap.height / 2f))))
+                rememberCutoutState(it, container.segmenter, SamPrompt.Auto)
             }
             if (state == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
