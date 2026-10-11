@@ -1,5 +1,7 @@
 # 拾野宣传片
 
+成片：`out/shiye_promo.mp4`，封面候选：`out/cover.jpg`。
+
 竖版 1080×1920、44.5 秒的小红书宣传片。画面是照着 App 代码（标本风）用 HTML/CSS 复刻的界面，逐帧截图后用 ffmpeg 合成。照片都是 Wikimedia Commons 上的真实照片，没有 AI 生成，作者和授权见 `credits.txt`。
 
 ## 重新渲染
