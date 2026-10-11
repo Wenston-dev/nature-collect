@@ -161,7 +161,7 @@ class SamSegmenter(private val context: Context) {
                 singleTap = prompt.points.size == 1 && negatives.isEmpty()
             }
             is SamPrompt.Lasso -> {
-                // Box corners use labels 2 (top-left) and 3 (bottom-right); no padding point.
+                // Box corners use labels 2 (top-left) and 3 (bottom-right).
                 val xs = prompt.path.map { it.x.coerceIn(0f, w - 1f) }
                 val ys = prompt.path.map { it.y.coerceIn(0f, h - 1f) }
                 coordList += listOf(xs.min(), ys.min(), xs.max(), ys.max())
@@ -171,6 +171,10 @@ class SamSegmenter(private val context: Context) {
                     coordList += p.y
                     labelList += 0f
                 }
+                // Unlike SAM, SAM 2 always ends the prompt with a padding point, boxes included.
+                coordList += 0f
+                coordList += 0f
+                labelList += -1f
                 singleTap = false
             }
         }
