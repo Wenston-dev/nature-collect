@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拾野 promo</title>
+<style>
+@font-face { font-family: "Noto Sans SC"; src: url(fonts/NotoSansSC-Regular.otf); font-weight: 400; }
+@font-face { font-family: "Noto Sans SC"; src: url(fonts/NotoSansSC-Medium.otf); font-weight: 500; }
+@font-face { font-family: "Noto Sans SC"; src: url(fonts/NotoSansSC-Bold.otf); font-weight: 700; }
+@font-face { font-family: "DM Mono"; src: url(fonts/dm_mono.ttf); font-weight: 400; }
+@font-face { font-family: "DM Mono"; src: url(fonts/dm_mono_medium.ttf); font-weight: 500; }
+:root {
+  --pine: #22392F; --soft: #6F8277; --rust: #B4532E; --celadon: #E2EBE3; --card: #FBFBF7;
+  --water: #C9DCD5; --divider: #DCE2DB; --label: #9FB0A4; --night: #101C16;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--celadon); }
+body { font-family: "Noto Sans SC", sans-serif; color: var(--pine); -webkit-font-smoothing: antialiased; }
+.mono { font-family: "DM Mono", monospace; }
+.abs { position: absolute; }
+#stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--celadon); }
+.grain { background-image: var(--grain); }
+/* captions */
+#cap { position: absolute; left: 0; top: 112px; width: 1080px; height: 220px; }
+.cap { position: absolute; left: 0; top: 0; width: 1080px; text-align: center; opacity: 0; }
+.cap .idx { font-family: "Noto Sans SC"; font-weight: 500; font-size: 28px; color: var(--rust); letter-spacing: 4px; }
+.cap .title { font-size: 72px; font-weight: 700; letter-spacing: 6px; margin-top: 10px; line-height: 1.15; }
+.cap .sub { font-size: 32px; color: var(--soft); letter-spacing: 2px; margin-top: 16px; }
+/* phone */
+#phone { position: absolute; left: 186px; top: 340px; width: 708px; height: 1506px; border-radius: 70px;
+  background: #1d2621; box-shadow: 0 30px 60px rgba(30,50,40,.22), 0 4px 10px rgba(30,50,40,.18), inset 0 0 0 2px #3a463f; }
+#screenwrap { position: absolute; left: 12px; top: 12px; width: 684px; height: 1482px; border-radius: 58px; overflow: hidden; background: var(--celadon); }
+#screen { position: absolute; left: 0; top: 0; width: 360px; height: 780px; transform: scale(1.9); transform-origin: 0 0; overflow: hidden; background: var(--celadon); }
+.scr { position: absolute; left: 0; top: 0; width: 360px; height: 780px; overflow: hidden; }
+.status { position: absolute; left: 0; top: 0; width: 360px; height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 22px; font-size: 11px; font-weight: 500; z-index: 50; }
+.status .icons { display: flex; gap: 5px; align-items: center; }
+.punch { position: absolute; left: 174px; top: 7px; width: 11px; height: 11px; border-radius: 50%; background: #0b0f0d; z-index: 60; }
+.gesture { position: absolute; left: 0; bottom: 0; width: 360px; height: 16px; z-index: 55; }
+.gesture i { position: absolute; left: 140px; bottom: 6px; width: 80px; height: 3.5px; border-radius: 2px; background: var(--pine); opacity: .55; }
+.icon { display: inline-block; width: 24px; height: 24px; background: currentColor; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.card { background: var(--card); box-shadow: 0 1px 2px rgba(30,50,40,.12), 0 0 1px rgba(30,50,40,.10); }
+.hair { height: .5px; background: rgba(34,57,47,.35); }
+.sticker { position: absolute; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.holo { position: absolute; inset: 0; -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; }
+/* nav */
+#nav { position: absolute; left: 0; bottom: 0; width: 360px; height: 104.5px; z-index: 40; }
+#nav .bar { position: absolute; left: 0; bottom: 0; width: 360px; height: 76.5px; background: var(--card); }
+#nav .bar .hl { position: absolute; left: 0; top: 0; width: 360px; height: .5px; background: rgba(34,57,47,.18); }
+#nav .row { position: absolute; left: 4px; top: .5px; width: 352px; height: 60px; display: flex; align-items: center; }
+.navitem { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 6px; color: var(--soft); }
+.navitem .icon { width: 21px; height: 21px; }
+.navitem .lb { font-size: 10px; letter-spacing: 1px; margin-top: 3px; padding-bottom: 6px; position: relative; }
+.navitem.on { color: var(--pine); }
+.navitem.on .lb { font-weight: 500; }
+.navitem.on .lb::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 14px; height: 2px; margin-left: -7px; background: var(--rust); }
+#shutterNav { position: absolute; left: 150px; width: 60px; height: 60px; border-radius: 50%; background: var(--card);
+  box-shadow: 0 2px 4px rgba(34,57,47,.2), inset 0 0 0 .8px rgba(180,83,46,.35); }
+#shutterNav::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--rust); }
+#shutterNav .icon { position: absolute; left: 18px; top: 18px; color: var(--rust); }
+/* page header */
+.ph { position: absolute; left: 0; top: 24px; width: 360px; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 6px 20px; }
+.ph .t { font-size: 22px; font-weight: 500; letter-spacing: 1px; }
+.hbtn { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; color: var(--pine); }
+.chips { position: absolute; left: 0; width: 360px; display: flex; gap: 8px; padding: 4px 16px; white-space: nowrap; overflow: hidden; }
+.chip { font-size: 15px; font-weight: 500; color: var(--soft); padding: 8px 10px; position: relative; flex: none; }
+.chip.on { color: var(--pine); }
+.chip .ul { position: absolute; left: 50%; bottom: 0; width: 14px; height: 2px; margin-left: -7px; background: var(--rust); transform-origin: center; }
+/* collection */
+.cell { position: absolute; width: 156px; height: 174px; }
+.cell .art { position: absolute; left: 14px; top: 16px; width: 128px; height: 117.8px; }
+.cell .hl { position: absolute; left: 8px; right: 8px; top: 141.8px; height: .5px; background: var(--divider); }
+.cell .lbl { position: absolute; left: 10px; right: 10px; top: 148px; display: flex; align-items: center; }
+.cell .nm { font-size: 13px; font-weight: 500; letter-spacing: .6px; flex: 1; }
+.cell .meta { font-family: "DM Mono"; font-size: 9px; letter-spacing: .3px; color: var(--soft); }
+/* label box */
+.hlabel { background: #fff; border: 1px solid var(--label); padding: 7px 9px; }
+.hlabel .head { font-family: "DM Mono"; font-size: 11px; letter-spacing: .6px; color: var(--soft); }
+.hlabel .name { font-size: 20px; font-weight: 500; letter-spacing: 1px; line-height: 26px; display: flex; align-items: center; }
+.hlabel .sci { font-family: "DM Mono"; font-size: 11px; letter-spacing: .6px; color: var(--soft); }
+.hlabel .dash { height: 1px; margin: 5px 0 4px; background-image: linear-gradient(to right, #C4CFC6 60%, transparent 60%); background-size: 5px 1px; }
+.hlabel .r { display: flex; align-items: center; padding: 1px 0; }
+.hlabel .r .k { width: 30px; font-size: 12px; color: var(--soft); flex: none; }
+.hlabel .r .v { font-family: "DM Mono"; font-size: 11px; letter-spacing: .6px; flex: 1; white-space: nowrap; }
+.pill { font-size: 15px; font-weight: 500; letter-spacing: 1px; padding: 12px 20px; border-radius: 2px; }
+.pill.p { background: var(--pine); color: var(--card); }
+.pill.o { background: var(--card); color: var(--pine); box-shadow: inset 0 0 0 1px rgba(34,57,47,.35); }
+.hint { display: inline-flex; align-items: center; padding: 8px 14px; font-size: 14px; letter-spacing: .5px; }
+/* tap indicator */
+#tap { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 0 1.5px rgba(34,57,47,.25), 0 2px 8px rgba(0,0,0,.18); z-index: 200; opacity: 0; pointer-events: none; }
+/* timeline */
+.trow { position: relative; display: flex; align-items: center; height: 60px; padding: 0 4px; }
+.trow .rail { position: relative; width: 20px; height: 60px; flex: none; }
+.trow .rail .ln { position: absolute; left: 9.5px; width: 1px; background: rgba(34,57,47,.25); }
+.trow .art { width: 48px; height: 48px; margin: 0 12px 0 8px; position: relative; flex: none; }
+.trow .d { font-family: "DM Mono"; font-size: 12px; letter-spacing: .6px; color: var(--soft); }
+.trow .p { font-size: 12px; color: var(--soft); }
+/* end */
+#end { position: absolute; inset: 0; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage" class="grain">
+  <!-- captions -->
+  <div id="cap"></div>
+
+  <!-- phone -->
+  <div id="phone">
+    <div id="screenwrap">
+      <div id="screen" class="grain">
+        <div class="punch"></div>
+        <div class="status" id="status"><span class="mono" style="font-family:'Noto Sans SC';font-weight:500">8:42</span>
+          <span class="icons">
+            <svg width="13" height="11" viewBox="0 0 13 11"><path d="M6.5 11 0 2.6A10.6 10.6 0 0 1 13 2.6z" fill="currentColor"/></svg>
+            <svg width="11" height="11" viewBox="0 0 11 11"><path d="M0 11 11 0v11z" fill="currentColor"/></svg>
+            <svg width="17" height="10" viewBox="0 0 17 10"><rect x=".5" y=".5" width="14" height="9" rx="2" fill="none" stroke="currentColor"/><rect x="2" y="2" width="9.5" height="6" rx="1" fill="currentColor"/><rect x="15.3" y="3.3" width="1.4" height="3.4" rx=".7" fill="currentColor"/></svg>
+          </span></div>
+
+        <!-- ===== camera: live ===== -->
+        <div class="scr" id="sLive" style="background:var(--night)">
+          <div class="abs" style="left:20px;top:40px;display:flex;align-items:center;">
+            <i style="width:6px;height:6px;border-radius:50%;background:var(--rust);display:block"></i>
+            <span style="margin-left:8px;font-size:14px;letter-spacing:1px;color:rgba(255,255,255,.85)">对准它，让它待在框中间</span>
+          </div>
+          <div class="abs" id="vf" style="left:12px;top:66px;width:336px;height:493.5px;border-radius:2px;overflow:hidden;background:#000">
+            <div id="vfimg" class="abs" style="inset:0;background:url(img/sparrow1.jpg) 57% 50%/cover"></div>
+            <svg class="abs" style="inset:0" width="336" height="493.5">
+              <g stroke="rgba(255,255,255,.85)" stroke-width="1.5" fill="none" stroke-linecap="square">
+                <path d="M20 42V20H42M294 20H316V42M20 451.5V473.5H42M294 473.5H316V451.5"/></g></svg>
+            <div id="focus" class="abs" style="border:2px solid #fff;border-radius:50%;opacity:0"></div>
+            <div class="abs" style="left:117px;bottom:14px;display:flex;align-items:center;gap:4px;padding:4px;border-radius:2px;background:rgba(16,28,22,.45)">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff" class="mono"><span style="font-size:11px">0.6x</span></div>
+              <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(251,251,247,.92);color:var(--pine)" class="mono"><span style="font-size:11px">1x</span></div>
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff" class="mono"><span style="font-size:11px">2x</span></div>
+            </div>
+            <div id="flash" class="abs" style="inset:0;background:#fff;opacity:0"></div>
+          </div>
+          <div class="abs" style="left:12px;top:579.5px;width:336px;height:86px;display:flex;justify-content:space-evenly;align-items:center">
+            <div style="display:flex;flex-direction:column;align-items:center;padding:10px 18px;color:rgba(255,255,255,.9)">
+              <i class="icon" style="width:22px;height:22px;-webkit-mask-image:url(icons/photo_library.svg)"></i>
+              <span style="font-size:12px;font-weight:500;letter-spacing:1px;margin-top:3px;color:rgba(255,255,255,.7)">相册</span></div>
+            <div id="shutter" style="width:78px;height:78px;border-radius:50%;border:2.5px solid var(--rust);padding:6px;">
+              <div style="width:100%;height:100%;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center">
+                <div style="width:54px;height:54px;border-radius:50%;box-shadow:inset 0 0 0 .8px rgba(180,83,46,.35)"></div></div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;padding:10px 18px;color:rgba(255,255,255,.9)">
+              <i class="icon" style="width:22px;height:22px;-webkit-mask-image:url(icons/cameraswitch.svg)"></i>
+              <span style="font-size:12px;font-weight:500;letter-spacing:1px;margin-top:3px;color:rgba(255,255,255,.7)">翻转</span></div>
+          </div>
+        </div>
+
+        <!-- ===== camera: finding subject ===== -->
+        <div class="scr grain" id="sFind" style="background-color:var(--celadon)">
+          <canvas id="findCanvas" class="abs" style="left:20px;width:320px"></canvas>
+          <div id="findChip" class="abs card hint" style="left:0;top:0">寻找主体</div>
+        </div>
+
+        <!-- ===== camera: sticker reveal ===== -->
+        <div class="scr" id="sStick">
+          <div class="abs" style="left:0;top:24px;width:360px;height:651.5px;overflow:hidden">
+            <div id="stBg" class="abs" style="inset:-40px;background:url(img/sparrow1.jpg) 57% 50%/cover"></div>
+            <div id="stWash" class="abs" style="inset:0;background:var(--celadon)"></div>
+            <canvas id="burst" class="abs" style="left:0;top:0;width:360px;height:651.5px" width="720" height="1303"></canvas>
+            <div id="stSticker" class="sticker" style="background-image:url(img/sparrow1_sticker.png)"><div class="holo" id="stHolo"></div></div>
+            <div class="abs" style="left:0;bottom:28px;width:360px;display:flex;flex-direction:column;align-items:center">
+              <div class="card hint"><i class="icon" style="width:16px;height:16px;color:var(--soft);-webkit-mask-image:url(icons/touch_app.svg)"></i><span style="margin-left:6px">用手指把贴纸往上揭下来，就能保存</span></div>
+              <div style="display:flex;gap:12px;margin-top:16px">
+                <div class="pill o">重拍</div><div class="pill o">圈选主体</div><div class="pill p">直接保存</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== camera: saved card ===== -->
+        <div class="scr grain" id="sSaved" style="background-color:var(--celadon)">
+          <div id="savedCol" class="abs" style="left:20px;width:320px;top:0">
+            <div class="card" style="position:relative;padding:18px">
+              <div style="height:220px;position:relative">
+                <div id="savedSticker" class="sticker" style="left:55px;top:15px;width:190px;height:190px;background-image:url(img/sparrow1_sticker.png)"><div class="holo" id="savedHolo"></div></div>
+              </div>
+              <div class="hlabel" style="margin-top:12px;padding:10px 12px;background:transparent">
+                <div class="head">已收入图鉴</div>
+                <div style="height:6px"></div>
+                <div id="savedWait" style="display:flex;align-items:center;font-size:14px;color:var(--soft)">
+                  <svg id="spin" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="var(--rust)" stroke-width="1.5" stroke-dasharray="26 40" stroke-linecap="round"/></svg>
+                  <span style="margin-left:8px">正在识别…</span></div>
+                <div id="savedDone" style="display:none">
+                  <div class="head">No.001 · 鸟类</div>
+                  <div style="font-size:20px;font-weight:500;letter-spacing:1px;margin-top:2px">麻雀</div>
+                  <div class="head">Passer montanus</div>
+                  <div style="height:.5px;background:var(--divider);margin:6px 0"></div>
+                  <div style="font-size:14px;line-height:20px">常见的小型鸟，头顶栗褐色，白脸颊上有一块黑斑，常成群在地面啄食。</div>
+                </div>
+              </div>
+              <svg id="savedStamp" class="abs" style="right:18px;top:18px" width="60" height="60"></svg>
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:20px">
+              <div class="pill o">查看详情</div><div class="pill p">继续拍</div></div>
+          </div>
+        </div>
+
+        <!-- ===== collection ===== -->
+        <div class="scr grain" id="sColl" style="background-color:var(--celadon)">
+          <div id="collInner" class="abs" style="left:0;top:0;width:360px;height:2000px">
+            <div class="ph"><span class="t">图鉴</span><span>
+              <span class="hbtn"><i class="icon" style="-webkit-mask-image:url(icons/file_download.svg)"></i></span>
+              <span class="hbtn"><i class="icon" style="-webkit-mask-image:url(icons/settings.svg)"></i></span></span></div>
+            <div class="abs" style="left:18px;top:74px;width:324px">
+              <div class="hair"></div>
+              <div style="display:flex;align-items:center">
+                <div style="flex:1;padding:6px 0 5px 10px"><div class="mono" id="stSp" style="font-size:18px;font-weight:500;line-height:23px">8</div><div style="font-size:10px;letter-spacing:.6px;color:var(--soft)">种</div></div>
+                <div style="width:.5px;height:30px;background:rgba(34,57,47,.2)"></div>
+                <div style="flex:1;padding:6px 0 5px 10px"><div class="mono" id="stTot" style="font-size:18px;font-weight:500;line-height:23px">15</div><div style="font-size:10px;letter-spacing:.6px;color:var(--soft)">次遇见</div></div>
+                <div style="width:.5px;height:30px;background:rgba(34,57,47,.2)"></div>
+                <div style="flex:1;padding:6px 0 5px 10px"><div class="mono" id="stNew" style="font-size:18px;font-weight:500;line-height:23px">+2</div><div style="font-size:10px;letter-spacing:.6px;color:var(--soft)">本月新种</div></div>
+              </div>
+              <div class="hair"></div>
+              <div style="display:flex;align-items:center;padding-top:8px;color:var(--soft)"><span style="font-size:12px;font-weight:500">成就</span><span class="mono" style="font-size:11px;margin-left:6px">4/24</span><i class="icon" style="width:16px;height:16px;-webkit-mask-image:url(icons/keyboard_arrow_right.svg)"></i></div>
+            </div>
+            <div class="chips" id="collChips" style="top:162px;padding-left:18px"></div>
+            <div id="grid"></div>
+          </div>
+        </div>
+
+        <!-- ===== detail ===== -->
+        <div class="scr grain" id="sDetail" style="background-color:var(--celadon)">
+          <div class="abs" style="left:0;top:24px;width:360px;height:756px;overflow:hidden"><div id="detInner" class="abs" style="left:0;top:0;width:360px"></div></div>
+        </div>
+
+        <!-- ===== map ===== -->
+        <div class="scr grain" id="sMap" style="background-color:var(--celadon)">
+          <div class="ph"><span class="t">地图</span><span class="mono" style="font-size:11px;letter-spacing:.6px;color:var(--soft);padding-right:8px">9 个地点</span></div>
+          <div class="chips" id="mapChips" style="top:74px"></div>
+          <div class="abs card" style="left:16px;top:134px;width:328px;height:525.5px;padding:6px">
+            <div id="mapBox" class="abs" style="left:6px;top:6px;width:316px;height:513.5px;overflow:hidden;background:var(--celadon)">
+              <div id="mapTiles" class="abs" style="left:0;top:0;width:768px;height:768px;background:url(img/map.png) 0 0/768px 768px;transform-origin:0 0;filter:saturate(.6) brightness(1.02)"></div>
+              <div id="markers" class="abs" style="left:0;top:0;width:768px;height:768px;transform-origin:0 0"></div>
+              <div class="abs mono" style="left:10px;top:10px;background:rgba(251,251,247,.85);padding:3px 6px;font-size:11px;letter-spacing:.6px">30.248°N  120.148°E</div>
+              <div class="abs" style="right:8px;top:8px;width:36px;height:36px;border-radius:2px;background:var(--card);display:flex;align-items:center;justify-content:center"><i class="icon" style="width:20px;height:20px;-webkit-mask-image:url(icons/center_focus_strong.svg)"></i></div>
+              <div class="abs mono" style="right:6px;bottom:4px;font-size:7px;color:var(--soft);background:rgba(251,251,247,.7);padding:1px 3px">© OpenStreetMap contributors</div>
+            </div>
+          </div>
+          <div id="mapScrim" class="abs" style="inset:0;background:#000;opacity:0;z-index:45"></div>
+          <div id="placeSheet" class="abs" style="left:0;width:360px;background:var(--card);z-index:46;padding-bottom:32px">
+            <div style="width:32px;height:4px;border-radius:2px;background:var(--label);margin:22px auto 22px"></div>
+            <div style="display:flex;align-items:center;padding:0 20px"><span style="flex:1;font-size:15px;font-weight:500">太子湾公园</span><span class="mono" style="font-size:11px;letter-spacing:.6px;color:var(--soft)">3 张 · 300 m</span></div>
+            <div class="hair" style="margin:10px 20px 0"></div>
+            <div id="placeGrid" style="display:flex;gap:10px;padding:12px 16px 0"></div>
+          </div>
+        </div>
+
+        <!-- ===== calendar ===== -->
+        <div class="scr grain" id="sCal" style="background-color:var(--celadon)">
+          <div class="ph"><span class="t">日历</span><span style="font-size:14px;font-weight:500;padding:0 12px">今天</span></div>
+          <div class="abs card" id="dayCard" style="left:16px;top:74px;width:328px;height:210px"></div>
+          <div class="chips" id="calChips" style="top:296px"></div>
+          <div class="abs" style="left:16px;top:340px;width:328px;height:48px;display:flex;align-items:center;justify-content:space-between">
+            <span class="hbtn" style="width:48px"><i class="icon" style="-webkit-mask-image:url(icons/keyboard_arrow_left.svg)"></i></span>
+            <span class="mono" style="font-size:15px;font-weight:500;letter-spacing:1px">2026 年 10 月</span>
+            <span class="hbtn" style="width:48px"><i class="icon" style="-webkit-mask-image:url(icons/keyboard_arrow_right.svg)"></i></span></div>
+          <div class="abs card" id="month" style="left:16px;top:392px;width:328px;padding:0 6px 8px"></div>
+        </div>
+
+        <!-- ===== board ===== -->
+        <div class="scr grain" id="sBoard" style="background-color:var(--celadon)">
+          <div class="abs" style="left:12px;top:36px;width:336px;height:42px;display:flex;align-items:center">
+            <span style="padding:4px 0 4px 8px;font-size:22px;font-weight:500;letter-spacing:1px">西湖 · 十月</span>
+            <i class="icon" style="color:var(--soft);-webkit-mask-image:url(icons/expand_more.svg)"></i>
+            <span style="flex:1"></span>
+            <span class="hbtn"><i class="icon" style="-webkit-mask-image:url(icons/fullscreen.svg)"></i></span>
+            <span class="hbtn"><i class="icon" style="-webkit-mask-image:url(icons/file_download.svg)"></i></span></div>
+          <div class="abs" id="sheet" style="left:30px;top:96px;width:300px;height:400px;background-color:var(--card);box-shadow:0 1px 2px rgba(30,50,40,.12);overflow:hidden" class="grain">
+            <svg id="pen" class="abs" style="left:0;top:0" width="300" height="400"></svg>
+          </div>
+          <div class="abs card" style="left:16px;top:516px;width:328px;height:62px;display:flex;align-items:center;padding:0 6px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><i class="icon" style="-webkit-mask-image:url(icons/emoji_nature.svg)"></i><span style="font-size:12px;color:var(--soft);font-weight:500">贴纸</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><i class="icon" style="-webkit-mask-image:url(icons/text_fields.svg)"></i><span style="font-size:12px;color:var(--soft);font-weight:500">文字</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><i class="icon" style="-webkit-mask-image:url(icons/draw.svg)"></i><span style="font-size:12px;color:var(--soft);font-weight:500">画笔</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><i class="icon" style="-webkit-mask-image:url(icons/palette.svg)"></i><span style="font-size:12px;color:var(--soft);font-weight:500">背景</span></div>
+          </div>
+        </div>
+
+        <!-- nav bar -->
+        <div id="nav">
+          <div class="bar"><div class="hl"></div>
+            <div class="row">
+              <div class="navitem" data-tab="coll"><i class="icon" style="-webkit-mask-image:url(icons/menu_book.svg)"></i><span class="lb">图鉴</span></div>
+              <div class="navitem" data-tab="map"><i class="icon" style="-webkit-mask-image:url(icons/public.svg)"></i><span class="lb">地图</span></div>
+              <div style="width:76px;flex:none"></div>
+              <div class="navitem" data-tab="cal"><i class="icon" style="-webkit-mask-image:url(icons/calendar_month.svg)"></i><span class="lb">日历</span></div>
+              <div class="navitem" data-tab="board"><i class="icon" style="-webkit-mask-image:url(icons/auto_awesome_mosaic.svg)"></i><span class="lb">贴纸板</span></div>
+            </div>
+          </div>
+          <div id="shutterNav"><i class="icon" style="-webkit-mask-image:url(icons/photo_camera.svg)"></i></div>
+        </div>
+        <div class="gesture"><i></i></div>
+        <div id="tap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- share card (1080x1440 drawn at 1:1, scaled) -->
+  <div id="share" class="abs grain" style="left:0;top:0;width:1080px;height:1440px;background-color:var(--celadon);transform-origin:0 0;opacity:0">
+    <div class="abs" style="left:64px;top:64px;width:952px;height:1312px;background:var(--card);box-shadow:0 3px 8px rgba(30,50,40,.16)"></div>
+    <div class="sticker" id="shareSticker" style="background-image:url(img/sparrow1_sticker.png);filter:drop-shadow(0 8px 10px rgba(27,42,32,.19))"></div>
+    <svg class="abs" id="shareStamp" style="left:818px;top:106px" width="156" height="156"></svg>
+    <div class="abs" id="shareLabel" style="right:112px;bottom:112px;width:600px;background:#fff;border:2.6px solid var(--label);padding:23.4px">
+      <div class="mono" style="font-size:24.7px;color:var(--soft);line-height:36px">No.001 · BIRD</div>
+      <div style="font-size:52px;font-weight:700;letter-spacing:6px;line-height:68px">麻雀</div>
+      <div class="mono" style="font-size:24.7px;color:var(--soft);line-height:36px">Passer montanus</div>
+      <div style="height:2.6px;margin:12px 0 6px;background-image:linear-gradient(to right,#C4CFC6 60%,transparent 60%);background-size:13px 2.6px"></div>
+      <div style="font-size:24.7px;line-height:35px"><span style="color:var(--soft);display:inline-block;width:78px">地点</span><span class="mono">西湖 · 孤山</span></div>
+      <div style="font-size:24.7px;line-height:35px"><span style="color:var(--soft);display:inline-block;width:78px">时间</span><span class="mono">2026.10.11 08:42</span></div>
+      <div style="font-size:24.7px;line-height:35px"><span style="color:var(--soft);display:inline-block;width:78px">坐标</span><span class="mono">30.2563N 120.1452E</span></div>
+      <div style="font-size:24.7px;line-height:35px"><span style="color:var(--soft);display:inline-block;width:78px">遇见</span><span class="mono">第 4 次</span></div>
+    </div>
+    <div class="abs mono" style="left:112px;bottom:116px;font-size:26px;letter-spacing:2px;color:var(--soft)">拾野 · SHIYE</div>
+  </div>
+
+  <!-- hook photos -->
+  <div id="hook" class="abs" style="left:0;top:0;width:1080px;height:1920px;overflow:hidden">
+    <div id="hookA" class="abs" style="inset:0;background:url(img/scene.jpg) 40% 50%/cover"></div>
+    <div id="hookB" class="abs" style="inset:0;background:url(img/sparrow1.jpg) 57% 50%/cover;opacity:0"></div>
+    <div id="hookShade" class="abs" style="left:0;right:0;bottom:0;height:900px;background:linear-gradient(to bottom,rgba(16,28,22,0),rgba(16,28,22,.55))"></div>
+    <div id="hookCap1" class="abs" style="left:0;width:1080px;top:1420px;text-align:center;color:#fff;font-size:76px;font-weight:700;letter-spacing:6px;text-shadow:0 2px 16px rgba(0,0,0,.25)">路上遇见的小鸟、野花</div>
+    <div id="hookCap2" class="abs" style="left:0;width:1080px;top:1330px;text-align:center;color:#fff;font-size:76px;font-weight:700;letter-spacing:6px;text-shadow:0 2px 16px rgba(0,0,0,.25);line-height:1.35">路上遇见的小鸟、野花<br>都能收进自己的图鉴</div>
+  </div>
+
+  <!-- end card -->
+  <div id="end" class="grain" style="background-color:var(--celadon)">
+    <img id="endLogo" src="shiye_mark.svg" class="abs" style="left:420px;top:560px;width:240px;height:240px">
+    <div id="endName" class="abs" style="left:0;width:1080px;top:850px;text-align:center;font-size:120px;font-weight:500;letter-spacing:16px">拾野</div>
+    <div id="endTag" class="abs" style="left:0;width:1080px;top:1030px;text-align:center;font-size:40px;letter-spacing:6px;color:var(--soft)">把遇见的自然，收进图鉴</div>
+    <div id="endRule" class="abs" style="left:490px;top:1130px;width:100px;height:3px;background:var(--rust)"></div>
+    <div id="endMono" class="abs mono" style="left:0;width:1080px;top:1170px;text-align:center;font-size:26px;letter-spacing:6px;color:var(--soft)">SHIYE · ANDROID</div>
+    <div id="endCredit" class="abs" style="left:0;width:1080px;top:1810px;text-align:center;font-size:20px;letter-spacing:1px;color:var(--soft);opacity:.8">照片来自 Wikimedia Commons（CC BY / CC BY-SA，作者见简介）· 地图 © OpenStreetMap 贡献者</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
