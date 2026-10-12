@@ -1,5 +1,5 @@
 import json, sys, urllib.request, urllib.parse, os, re, time
-UA = "ShiyePromo/1.0 (personal promo video; contact wgd753@gmail.com)"
+UA = "ShiyePromo/1.0 (personal promo video; https://github.com/Wenston-dev/nature-collect)"
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     for i in range(4):

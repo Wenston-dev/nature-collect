@@ -1,12 +1,51 @@
-# 拾野
+<p align="center">
+  <img src="promo/site/shiye_mark.svg" alt="" width="96">
+</p>
 
-<img src="promo/out/cover.jpg" alt="拾野" width="260" align="right">
+<h1 align="center">拾野</h1>
 
-拍下路上遇见的鸟、花、草木和小动物，拾野会把它抠成一张贴纸，认出它叫什么，收进你自己的图鉴。
+<p align="center">
+  拍下路上遇见的鸟、花、草木和小动物，拾野会把它抠成一张贴纸，认出它叫什么，收进你自己的图鉴。
+</p>
+
+<p align="center">
+  <a href="https://github.com/Wenston-dev/nature-collect/releases/latest"><img src="https://img.shields.io/github/v/release/Wenston-dev/nature-collect?label=%E4%B8%8B%E8%BD%BD&color=3f6b4f" alt="最新版本"></a>
+  <img src="https://img.shields.io/badge/Android-8.0%2B-3f6b4f" alt="Android 8.0+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3f6b4f" alt="MIT"></a>
+</p>
+
+<p align="center">
+  中文 · <a href="README.en.md">English</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/capture.jpg" width="23%" alt="拍照">
+  <img src="docs/screenshots/identify.jpg" width="23%" alt="识别">
+  <img src="docs/screenshots/guide.jpg" width="23%" alt="图鉴">
+  <img src="docs/screenshots/timeline.jpg" width="23%" alt="物种时间线">
+</p>
+<p align="center">
+  <img src="docs/screenshots/map.jpg" width="23%" alt="地图">
+  <img src="docs/screenshots/calendar.jpg" width="23%" alt="日历">
+  <img src="docs/screenshots/board.jpg" width="23%" alt="贴纸板">
+  <img src="docs/screenshots/card.jpg" width="23%" alt="分享卡">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Wenston-dev/nature-collect/raw/main/promo/out/shiye_promo.mp4">看宣传片（45 秒）</a>
+</p>
 
 安卓 App，免费、开源，不依赖 Google 服务。
 
-[English](#english)
+## 下载
+
+- **最新版**：[Releases 页面](https://github.com/Wenston-dev/nature-collect/releases/latest)，下载其中的 `shiye-vX.Y.Z.apk`
+- **v1.0.0**：[shiye-v1.0.0.apk](https://github.com/Wenston-dev/nature-collect/releases/download/v1.0.0/shiye-v1.0.0.apk)
+
+把 APK 传到手机上打开安装，第一次装需要允许「安装未知来源应用」。
+
+- 需要 Android 8.0 及以上，64 位 ARM 手机（近几年的手机基本都是）。
+- 新版本直接覆盖安装，数据会保留。
 
 ## 功能
 
@@ -20,13 +59,6 @@
 - **分享卡**：把一次收集做成标本卡片的样子，保存或分享。
 - **成就**：按自然分类累计物种数，到一定数量解锁。
 - **其他**：中英文切换，备份导出与导入（换手机用）。
-
-## 下载安装
-
-到 [Releases](https://github.com/Wenston-dev/nature-collect/releases) 页面下载最新的 `shiye-vX.Y.Z.apk`，传到手机上打开安装。第一次装需要允许「安装未知来源应用」。
-
-- 需要 Android 8.0 及以上，64 位 ARM 手机（近几年的手机基本都是）。
-- 新版本直接覆盖安装即可，数据会保留。
 
 ## 配置 AI 识别
 
@@ -55,17 +87,17 @@ APK 在 `app/build/outputs/apk/debug/`。
 2. 推送同名 tag：
 
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
 
-GitHub Actions 会编译 APK，并在 Releases 页面建好对应版本，附上安装包。tag 和 `versionName` 对不上时构建会直接失败。
+GitHub Actions 会编译 APK，在 Releases 页面建好对应版本并附上安装包。tag 和 `versionName` 对不上时构建会直接失败。
 
 不方便推 tag 时，也可以在 Actions 页面手动运行 Android build 并勾选 release，会按 `versionName` 自动打 tag 并发布。
 
 ### 签名密钥
 
-安卓只允许用同一把密钥签名的新版本覆盖旧版本。CI 从仓库 Secret `SIGNING_KEYSTORE_BASE64` 读取签名密钥（keystore 文件的 base64 文本，密码和别名为 `android` / `androiddebugkey`）。没有这个 Secret 时，退回到 Actions 缓存里的密钥；缓存 7 天没用就会被清掉，之后的安装包就无法覆盖安装了，所以正式发布前请先设好 Secret。
+安卓只允许用同一把密钥签名的新版本覆盖旧版本。CI 从仓库 Secret `SIGNING_KEYSTORE_BASE64`（keystore 文件的 base64 文本）读取签名密钥。没有这个 Secret 时退回到 Actions 缓存里的密钥，缓存 7 天没用会被清掉，之后的安装包就无法覆盖安装，所以发布前请先设好 Secret。Fork 出去自己发布的话，请换成你自己的密钥。
 
 ## 技术栈
 
@@ -77,23 +109,10 @@ GitHub Actions 会编译 APK，并在 Releases 页面建好对应版本，附上
 | 地图 | MapLibre，高德瓦片 / OpenFreeMap；地名来自 Nominatim |
 | 存储 | Room + 本地图片文件 |
 
-`app/src/main/assets/sam/` 里的 EdgeTAM 模型由 `tools/export_edgetam_onnx.py` 从官方权重导出，只保留单张图片分割部分，和 PyTorch 原版对比掩码 IoU 约 0.997。`u2netp.onnx` 是 U²-Net 的轻量显著性模型，用来先找到画面主体，再交给 EdgeTAM 精确分割。两者都以 Apache-2.0 协议发布。
+`app/src/main/assets/sam/` 里的 EdgeTAM 模型由 `tools/export_edgetam_onnx.py` 从官方权重导出，只保留单张图片分割部分，和 PyTorch 原版对比掩码 IoU 约 0.997。`u2netp.onnx` 是 U²-Net 的轻量显著性模型，用来先找到画面主体，再交给 EdgeTAM 精确分割。
 
-`promo/` 是宣传片的源文件，见其中的 README。
+`promo/` 是宣传片的源文件，说明见 [promo/README.md](promo/README.md)。上面的截图取自宣传片。
 
 ## 开源协议
 
-代码以 [MIT](LICENSE) 协议发布。随附的 EdgeTAM、U²-Net 模型为 Apache-2.0，DM Mono 字体为 SIL Open Font License，宣传片里的照片来自 Wikimedia Commons，作者和授权见 `promo/credits.txt`。
-
----
-
-## English
-
-**Shiye** (拾野) turns the birds, flowers, plants and small animals you photograph into stickers, identifies them, and keeps them in your own field guide. Free and open source Android app, no Google services required.
-
-- **Install**: download `shiye-vX.Y.Z.apk` from [Releases](https://github.com/Wenston-dev/nature-collect/releases). Android 8.0+, 64-bit ARM. New versions install over the old one.
-- **Identification**: uses any OpenAI-compatible chat completions API with image input. DeepSeek is the default; get a key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it in Settings. Only the cut-out sticker is uploaded; cut-out runs on the phone.
-- **Features**: on-device cut-out, identification, field guide with categories, per-species timeline, map, calendar, sticker boards, share cards, achievements, Chinese/English UI, backup and restore.
-- **Build**: JDK 17 + Android SDK, `./gradlew assembleDebug`.
-- **License**: MIT. Bundled models are Apache-2.0, the DM Mono font is OFL, promo photos are credited in `promo/credits.txt`.
-- **Release**: bump `versionCode` / `versionName`, push a tag `vX.Y.Z`; GitHub Actions builds the APK and attaches it to a release.
+代码以 [MIT](LICENSE) 协议发布。随附的 EdgeTAM、U²-Net 模型为 Apache-2.0，DM Mono 字体为 SIL Open Font License。宣传片里的照片来自 Wikimedia Commons，作者和授权见 [promo/credits.txt](promo/credits.txt)。

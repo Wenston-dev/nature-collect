@@ -1,6 +1,6 @@
 import re, json, urllib.request, time, os, io
 from PIL import Image
-UA = "ShiyePromo/1.0 (personal promo video; contact wgd753@gmail.com)"
+UA = "ShiyePromo/1.0 (personal promo video; https://github.com/Wenston-dev/nature-collect)"
 picks = {"sparrow1": ("sparrow", 5), "sparrow2": ("sparrow", 2), "sparrow3": ("sparrow", 3), "sparrow4": ("sparrow", 6),
          "bulbul": ("bulbul", 6), "magpie": ("magpie", 6), "violet": ("violet", 4), "ginkgo": ("ginkgo", 4),
          "ladybird": ("ladybird", 9), "dandelion": ("dandelion", 0), "butterfly": ("butterfly", 7),
